@@ -49,7 +49,10 @@ input int    MaxHoldBars        = 12;     // 12 แท่ง M5 = 1 ชั่ว
 input int    ScalpMaxSLPoints   = 1000;   // scalp entries wider than this are skipped
 input double ScalpMinRR         = 1.0;    // skip when nearest structure offers less than this R
 input double ScalpMaxRR         = 2.0;    // cap structural target at this R
-input double ScalpVolMult       = 0.8;    // modest tick-volume confirmation for scalp signals
+input double ScalpMinADX        = 18.0;   // skip weak M15 trends; 0 disables this filter
+input double ScalpMinTrendGapATR= 0.10;   // M15 EMA20/50 separation as a fraction of ATR; 0 disables
+input double ScalpMinSlopeATR   = 0.02;   // M15 EMA20 slope over two closed bars; 0 disables
+input double ScalpVolMult       = 1.0;    // require signal-bar tick volume near/above its 20-bar mean
 input bool   EnableRecoverySizing = false; // keep off until the base strategy passes out-of-sample tests
 input double RecoveryMultiplier  = 1.20;  // risk grows modestly after each loss
 input int    RecoveryMaxSteps     = 2;     // risk cap remains active at every step
@@ -93,6 +96,7 @@ input int    BreakoutEndHour    = 15;
 //--- handles
 int hATR, hEmaFast, hEmaSlow, hRSI, hADX, hCrossFast, hCrossSlow;
 int hTrendFastH1, hTrendSlowH1, hPullbackEMA, hScalpTrendFast, hScalpTrendSlow;
+int hScalpADX, hScalpATR;
 datetime lastBarTime   = 0;
 int      lastTradeDay  = -1;
 double   signalStructSL = 0;
@@ -123,7 +127,8 @@ int OnInit()
       MaxTradesPerDay < 0 || MaxConsecLosses < 1 || PauseHoursAfterLoss < 0 ||
       RecoveryMultiplier < 1.0 || RecoveryMaxSteps < 0 || PullbackVolMult < 0 ||
       LotPer100USD <= 0 || ScalpMaxSLPoints < 1 || ScalpMinRR <= 0 ||
-      ScalpMaxRR < ScalpMinRR || ScalpVolMult < 0 ||
+      ScalpMaxRR < ScalpMinRR || ScalpMinADX < 0 || ScalpMinTrendGapATR < 0 ||
+      ScalpMinSlopeATR < 0 || ScalpVolMult < 0 ||
       StartHour < 0 || StartHour > 23 || EndHour < 1 || EndHour > 24 || StartHour >= EndHour)
    {
       Print("ค่าตั้งต้นไม่ถูกต้อง: ตรวจ Risk/RR/ATR/เวลา/Recovery ก่อนเริ่ม EA");
@@ -142,12 +147,15 @@ int OnInit()
    hPullbackEMA = iMA(_Symbol, TF, 21, 0, MODE_EMA, PRICE_CLOSE);
    hScalpTrendFast = iMA(_Symbol, PERIOD_M15, 20, 0, MODE_EMA, PRICE_CLOSE);
    hScalpTrendSlow = iMA(_Symbol, PERIOD_M15, 50, 0, MODE_EMA, PRICE_CLOSE);
+   hScalpADX = iADX(_Symbol, PERIOD_M15, ADX_Period);
+   hScalpATR = iATR(_Symbol, PERIOD_M15, ATR_Period);
 
    if(hATR==INVALID_HANDLE || hEmaFast==INVALID_HANDLE || hEmaSlow==INVALID_HANDLE ||
       hRSI==INVALID_HANDLE || hADX==INVALID_HANDLE || hCrossFast==INVALID_HANDLE ||
       hCrossSlow==INVALID_HANDLE || hTrendFastH1==INVALID_HANDLE || hTrendSlowH1==INVALID_HANDLE ||
       hPullbackEMA==INVALID_HANDLE || hScalpTrendFast==INVALID_HANDLE ||
-      hScalpTrendSlow==INVALID_HANDLE)
+      hScalpTrendSlow==INVALID_HANDLE || hScalpADX==INVALID_HANDLE ||
+      hScalpATR==INVALID_HANDLE)
    {
       Print("สร้าง indicator ไม่สำเร็จ");
       return INIT_FAILED;
@@ -171,6 +179,7 @@ void OnDeinit(const int reason)
    IndicatorRelease(hTrendFastH1); IndicatorRelease(hTrendSlowH1);
    IndicatorRelease(hPullbackEMA);
    IndicatorRelease(hScalpTrendFast); IndicatorRelease(hScalpTrendSlow);
+   IndicatorRelease(hScalpADX); IndicatorRelease(hScalpATR);
 }
 
 //+------------------------------------------------------------------+
@@ -588,7 +597,15 @@ int SignalScalpPA()
    if(trendShift < 1) return 0;
    double trendFast = Buf(hScalpTrendFast, trendShift);
    double trendSlow = Buf(hScalpTrendSlow, trendShift);
-   if(trendFast == EMPTY_VALUE || trendSlow == EMPTY_VALUE || trendFast == trendSlow) return 0;
+   double trendFastOld = Buf(hScalpTrendFast, trendShift + 2);
+   double trendATR = Buf(hScalpATR, trendShift);
+   double trendADX = Buf(hScalpADX, trendShift, 0);
+   if(trendFast == EMPTY_VALUE || trendSlow == EMPTY_VALUE || trendFastOld == EMPTY_VALUE ||
+      trendATR == EMPTY_VALUE || trendATR <= 0 || trendADX == EMPTY_VALUE || trendFast == trendSlow)
+      return 0;
+   if(ScalpMinADX > 0 && trendADX < ScalpMinADX) return 0;
+   if(ScalpMinTrendGapATR > 0 && MathAbs(trendFast - trendSlow) / trendATR < ScalpMinTrendGapATR)
+      return 0;
 
    double o1 = iOpen(_Symbol, TF, 1), c1 = iClose(_Symbol, TF, 1);
    double h1 = iHigh(_Symbol, TF, 1), l1 = iLow(_Symbol, TF, 1);
@@ -611,9 +628,13 @@ int SignalScalpPA()
    double volAverage = volSum / 20.0;
    if((double)iTickVolume(_Symbol, TF, 1) < ScalpVolMult * volAverage) return 0;
 
-   bool buy = trendFast > trendSlow && emaFast > emaSlow &&
+   bool buy = trendFast > trendSlow &&
+              (ScalpMinSlopeATR == 0 || (trendFast - trendFastOld) / trendATR >= ScalpMinSlopeATR) &&
+              emaFast > emaSlow &&
               l1 <= emaFast + 0.20 * atr && c1 > emaFast && (bullReject || bullEngulf);
-   bool sell = trendFast < trendSlow && emaFast < emaSlow &&
+   bool sell = trendFast < trendSlow &&
+               (ScalpMinSlopeATR == 0 || (trendFastOld - trendFast) / trendATR >= ScalpMinSlopeATR) &&
+               emaFast < emaSlow &&
                h1 >= emaFast - 0.20 * atr && c1 < emaFast && (bearReject || bearEngulf);
    if(buy)
    {

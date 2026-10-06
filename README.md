@@ -5,7 +5,7 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 ## Current EA behavior
 
 - The default mode is `SCALP_PA` on M5, using an M15 trend filter. Other experimental strategies remain selectable.
-- Scalping entries require a pullback/rejection or engulfing candle aligned with the M15 EMA trend, plus tick-volume confirmation. It may skip many bars and cannot guarantee a fixed trade cadence.
+- Scalping entries require a pullback/rejection or engulfing candle aligned with the M15 EMA trend, plus tick-volume confirmation. The quality-filter candidate also requires M15 ADX, EMA separation, and EMA slope thresholds; compare it with those filters set to zero on identical in-sample and untouched out-of-sample periods. It may skip many bars and cannot guarantee a fixed trade cadence or higher win rate.
 - The target is the nearest recent support/resistance level, capped at 2R; entries are skipped if that level offers less than 1R. Maximum holding time is 12 M5 bars (one hour).
 - Volume scales at 0.01 lot per $100 equity (so $100 targets 0.01 lot), rounded down to the broker's volume step. The EA skips the order if estimated loss at the stop exceeds the 10% per-trade cap or margin is insufficient.
 - Scalping stops wider than 1,000 symbol points are skipped. Check the broker's XAUUSD digits and point size; 1,000 points equals $10 only when `_Point` is 0.01.
@@ -27,7 +27,7 @@ The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point
 2. Copy `XAU_Pro_EA.mq5` there and compile it in MetaEditor with **F7**.
 3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run. After recompiling, reset Inputs to the EA defaults so the new scalp mode is selected.
 4. Test with broker-appropriate spread, commission, swap, leverage, and execution delay. Review the Report, Equity graph, and Journal.
-5. Compare the EA tester with the Python backtest before any forward demo trial. Backtests are not a guarantee of future performance.
+5. To evaluate the new signal-quality filters, run a baseline with `ScalpMinADX=0`, `ScalpMinTrendGapATR=0`, `ScalpMinSlopeATR=0`, and `ScalpVolMult=0.8`, then the candidate defaults, using identical dates and execution settings. Keep a later date range untouched for out-of-sample checking. Compare win rate together with profit factor, expectancy, drawdown, and trade count. Backtests are not a guarantee of future performance.
 
 ## Python backtest
 
