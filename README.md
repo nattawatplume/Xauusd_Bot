@@ -14,7 +14,7 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 - BOS uses a 2.0 tick-volume threshold and no H1 direction filter.
 - Uses a structural stop with ATR bounds, a 1.5R initial target, and an 8-hour maximum holding time on M15.
 - Allows unlimited entries per broker day when `MaxTradesPerDay=0`, while still permitting only one EA position at a time.
-- Keeps daily-loss, peak-drawdown, spread, margin, and consecutive-loss cooldown protections enabled.
+- Keeps daily-loss, spread, margin, and consecutive-loss cooldown protections enabled. The 10% peak-equity drawdown circuit breaker closes this EA's open position and halts new entries; a gap or rejected close can still exceed the threshold.
 - Bounded martingale recovery sizing remains available as an experiment but is disabled by default. It can double the base lot after losses for at most two steps, subject to the per-trade, daily-loss, drawdown, and margin guards. It cannot create a trading edge or guarantee recovery.
 - Estimates stop loss using `OrderCalcProfit`; fees, slippage, gaps, and fast-market execution can increase actual losses beyond that estimate.
 
@@ -26,7 +26,7 @@ The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point
 
 1. In MT5, choose **File → Open Data Folder → MQL5 → Experts**.
 2. Copy `XAU_Pro_EA.mq5` there and compile it in MetaEditor with **F7**.
-3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization. After recompiling, reset retained Inputs or explicitly set `Strategy=SCALP_PA` (numeric value 7), `EnableRecoverySizing=false`, and `MaxRiskPercent=5`. Compare `SCALP_ACTIVE` separately, changing only the strategy input.
+3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization. After recompiling, reset retained Inputs or explicitly set `Strategy=SCALP_PA` (numeric value 7), `EnableRecoverySizing=false`, `MaxRiskPercent=5`, and `MaxDrawdownPct=10`. Compare `SCALP_ACTIVE` separately, changing only the strategy input. If the EA has already latched its drawdown halt, set `ResetPeakOnInit=true` once to reset it, then return the input to `false`.
 4. Test with broker-appropriate spread, commission, swap, leverage, and execution delay. Review the Report, Equity graph, and Journal.
 5. Set Forward to `1/3` for an initial check and compare the Forward report separately. Compare win rate together with profit factor, expectancy, drawdown, and trade count. The EA has no fixed daily trade quota, allows one position at a time, and may have days with no valid setup. Backtests are not a guarantee of future performance.
 
@@ -42,4 +42,4 @@ For a separate dataset, use `--csv path.csv` or `--parquet path.parquet`. The cu
 
 ## Known research status
 
-User-shared runs include an aggregate positive period for one configuration, but the latest active-mode report showed net loss USD 16.21 with PF 0.43 and its Forward result showed two losing trades totaling USD 20.90. This does not establish a robust edge. See [RESEARCH.md](RESEARCH.md) for the evidence review and validation plan. These changes are for controlled research, not a claim of profitability; MetaEditor compilation and fresh baseline/Forward runs are required.
+Latest user-shared SCALP_PA results showed an in-sample net gain of USD 19.59 (PF 1.28, 50 trades) but Forward net loss of USD 16.21 (PF 0.23, 7 trades) with roughly 20% equity drawdown. Seven forward trades are too few to establish a persistent edge, but the loss exposed that the old drawdown guard only blocked new entries and did not close an open EA position. Version 1.81 lowers the peak-drawdown halt to 10% and closes this EA's open position when that limit is reached. This is a risk-control change, not a win-rate fix; execution gaps/rejections can exceed the threshold. See [RESEARCH.md](RESEARCH.md) for validation guidance. MetaEditor compilation and a fresh demo forward observation are still required.

@@ -7,7 +7,7 @@
 //|        real ticks" > Symbol XAUUSD > ช่วงเวลา >= 2 ปี              |
 //+------------------------------------------------------------------+
 #property copyright "Nattawat"
-#property version   "1.80"
+#property version   "1.81"
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -76,7 +76,7 @@ input double MaxDailyLossPct    = 1.5;    // daily equity loss stop remains acti
 input int    MaxTradesPerDay    = 0;      // 0 = no daily trade-count limit
 input int    MaxConsecLosses    = 4;      // consecutive losses before a cooldown
 input int    PauseHoursAfterLoss= 4;      // cooldown after the loss streak
-input double MaxDrawdownPct     = 15.0;   // halt new entries after equity drawdown from peak
+input double MaxDrawdownPct     = 10.0;   // close this EA's positions and halt after equity drawdown from peak
 input bool   ResetPeakOnInit    = false;  // true = รีเซ็ต peak/สถานะหยุด ตอนโหลด EA (ใช้ครั้งเดียวแล้วปิด)
 input int    StartHour          = 0;      // เวลา server ของโบรกเกอร์
 input int    EndHour            = 24;     // 24=เทรดได้ถึงวันใหม่ตามเวลา server
@@ -131,6 +131,7 @@ int OnInit()
       RR <= 0 || ATR_Period < 1 || MaxHoldBars < 1 ||
       MinRiskATR <= 0 || MaxRiskATR < MinRiskATR ||
       MaxDailyLossPct <= 0 || MaxDailyLossPct >= 100 ||
+      MaxDrawdownPct <= 0 || MaxDrawdownPct >= 100 ||
       MaxTradesPerDay < 0 || MaxConsecLosses < 1 || PauseHoursAfterLoss < 0 ||
       RecoveryMultiplier < 1.0 || RecoveryMultiplier > 2.0 ||
       RecoveryMaxSteps < 0 || RecoveryMaxSteps > 2 || PullbackVolMult < 0 ||
@@ -173,6 +174,7 @@ int OnInit()
 
    if(ResetPeakOnInit || !GlobalVariableCheck(GVPeak()))
       GlobalVariableSet(GVPeak(), AccountInfoDouble(ACCOUNT_EQUITY));
+   if(!GlobalVariableCheck(GVHalt())) GlobalVariableSet(GVHalt(), 0);
    if(ResetPeakOnInit) GlobalVariableSet(GVHalt(), 0);
 
    trade.SetExpertMagicNumber(MagicNumber);
@@ -210,6 +212,43 @@ bool HasPosition()
          return true;
    }
    return false;
+}
+
+// Hard equity circuit breaker. Check every tick so an open EA position is
+// closed as soon as account equity reaches the configured peak-drawdown limit.
+void EnforceEquityDrawdownStop()
+{
+   double eq = AccountInfoDouble(ACCOUNT_EQUITY);
+   double peak = GlobalVariableCheck(GVPeak()) ? GlobalVariableGet(GVPeak()) : eq;
+   if(eq > peak)
+   {
+      peak = eq;
+      GlobalVariableSet(GVPeak(), peak);
+   }
+
+   bool limitReached = peak > 0 && eq <= peak * (1.0 - MaxDrawdownPct / 100.0);
+   if(limitReached && GlobalVariableGet(GVHalt()) != 1)
+   {
+      PrintFormat("HARD KILL-SWITCH: equity %.2f ต่ำกว่า peak %.2f ถึง %.1f%% -> ปิด position ของ EA และหยุดเปิดไม้ใหม่",
+                  eq, peak, MaxDrawdownPct);
+      GlobalVariableSet(GVHalt(), 1);
+   }
+
+   if(GlobalVariableGet(GVHalt()) != 1) return;
+
+   // If a close is rejected or requoted, try again on the next tick.
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionGetSymbol(i) != _Symbol || PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+         continue;
+
+      ulong ticket = (ulong)PositionGetInteger(POSITION_TICKET);
+      bool sent = trade.PositionClose(ticket);
+      uint rc = trade.ResultRetcode();
+      if(!sent || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_DONE_PARTIAL))
+         PrintFormat("HARD KILL-SWITCH: ปิด position ไม่สำเร็จ ticket=%I64u retcode=%u %s",
+                     ticket, rc, trade.ResultRetcodeDescription());
+   }
 }
 
 //--- ถือนานเกินกำหนด -> ปิด
@@ -966,6 +1005,7 @@ void OpenTrade(int dir)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   EnforceEquityDrawdownStop();       // hard stop ต้องทำงานทุก tick ไม่รอแท่ง M5 ใหม่
    ManageBreakEven();                 // เช็คทุก tick เพราะกำไรอาจถึงเกณฑ์กลางแท่ง
 
    // ที่เหลือทำงานครั้งเดียวต่อแท่ง (ตอนแท่งใหม่เปิด) = ใช้แท่งที่ปิดแล้วเท่านั้น
