@@ -7,7 +7,7 @@
 //|        real ticks" > Symbol XAUUSD > ช่วงเวลา >= 2 ปี              |
 //+------------------------------------------------------------------+
 #property copyright "Nattawat"
-#property version   "1.70"
+#property version   "1.80"
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -27,12 +27,12 @@ enum ENUM_STRAT
 };
 
 //--- ตั้งค่าทั่วไป
-input ENUM_STRAT      Strategy          = STRAT_SCALP_ACTIVE;
+input ENUM_STRAT      Strategy          = STRAT_SCALP_PA;
 input ENUM_TIMEFRAMES TF                = PERIOD_M5;
 input long            MagicNumber       = 234567;
 
 //--- risk-based money management; minimum volume can exceed the cap on a $100 account
-input double MaxRiskPercent     = 10.0;   // hard per-trade loss cap, including estimated stop loss
+input double MaxRiskPercent     = 5.0;    // hard per-trade loss cap; min broker lot can still cause the EA to skip
 input double LotPer100USD       = 0.01;   // $100 equity -> 0.01 lot; actual risk is checked before entry
 input double MaxMarginUsePct    = 50.0;   // margin ของไม้นี้ต้องไม่เกิน % ของ free margin
 input double SL_ATR_Mult        = 1.0;    // fallback SL = ATR x ค่านี้
@@ -60,7 +60,7 @@ input double ActiveSlopeATR     = 0.01;   // M15 EMA20 slope over two closed bar
 input double ActiveVolMult      = 0.80;   // M5 signal-bar tick volume vs prior 20-bar mean
 input double ActiveTouchATR     = 0.35;   // pullback may touch EMA9 or EMA21 within this ATR band
 input int    ActiveBreakoutBars = 6;      // allow confirmed continuation close beyond recent range
-input bool   EnableRecoverySizing = true;  // bounded martingale: increase size after losses
+input bool   EnableRecoverySizing = false; // disable martingale until the strategy passes forward validation
 input double RecoveryMultiplier  = 2.00;  // double base lot after each consecutive loss
 input int    RecoveryMaxSteps     = 2;     // stop increasing after 2 steps; never bypass the risk cap
 

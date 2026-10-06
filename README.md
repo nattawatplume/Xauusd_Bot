@@ -4,29 +4,29 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 
 ## Current EA behavior
 
-- The default mode is the experimental `SCALP_ACTIVE` on M5, using closed M15 EMA20/EMA50 trend direction. It can enter on either an EMA pullback/rejection or a strong close beyond a short recent range. Softer ADX, EMA-gap, slope, and tick-volume thresholds are intended to increase valid setup frequency; they are not evidence of higher accuracy or profitability.
-- `SCALP_PA` remains available as the stricter baseline. Compare both modes over identical real-tick dates and costs, including a later untouched/forward period.
-- The active mode defaults to M15 ADX 14, EMA separation 0.05 ATR, two-bar EMA slope 0.01 ATR, M5 signal tick volume 0.8 times the preceding 20-bar mean, and a six-bar continuation range. These are starting values for comparison, not optimized or proven values.
+- The default mode is `SCALP_PA` on M5, using closed M15 trend direction, as the simpler comparison baseline. The more permissive `SCALP_ACTIVE` mode remains available for experiments; it is not the default because the latest user-shared run lost money.
+- Compare `SCALP_PA` and `SCALP_ACTIVE` over identical real-tick dates and costs, including a later untouched/forward period.
+- The active mode uses M15 ADX 14, EMA separation 0.05 ATR, two-bar EMA slope 0.01 ATR, M5 signal tick volume 0.8 times the preceding 20-bar mean, and a six-bar continuation range. These are experimental, not optimized or proven values.
 - The target uses the nearest recent support/resistance level, capped at 2R; entries are skipped if a known level offers less than 1R. In active mode only, if no forward structure is present, the target falls back to the configured minimum R. Maximum holding time is 12 M5 bars (one hour).
-- Volume scales at 0.01 lot per $100 equity (so $100 targets 0.01 lot), rounded down to the broker's volume step. The EA skips the order if estimated loss at the stop exceeds the 10% per-trade cap or margin is insufficient.
+- Volume scales at 0.01 lot per $100 equity (so $100 targets 0.01 lot), rounded down to the broker's volume step. The default estimated per-trade risk cap is 5%; if the broker's minimum lot exceeds it, the EA skips the order. The cap does not cover all slippage, gaps, or fees.
 - Scalping stops wider than 1,000 symbol points are skipped. Check the broker's XAUUSD digits and point size; 1,000 points equals $10 only when `_Point` is 0.01.
 - Default day-trade mode tries volume-confirmed BOS first, then an H1-trend / EMA21 rejection pullback with volume confirmation to add setups. The combined mode has not yet passed an independent backtest.
 - BOS uses a 2.0 tick-volume threshold and no H1 direction filter.
 - Uses a structural stop with ATR bounds, a 1.5R initial target, and an 8-hour maximum holding time on M15.
 - Allows unlimited entries per broker day when `MaxTradesPerDay=0`, while still permitting only one EA position at a time.
 - Keeps daily-loss, peak-drawdown, spread, margin, and consecutive-loss cooldown protections enabled.
-- Enables bounded martingale recovery sizing by default: the base lot doubles after each consecutive loss, at most two steps (up to 4x base lot), then stops increasing. Every order still passes the hard 10% estimated per-trade risk cap, daily loss stop, peak drawdown stop, and four-loss cooldown. If the next size exceeds the risk or margin guard, the EA skips it. This can compound losses quickly and cannot guarantee recovery; disable `EnableRecoverySizing` to compare against fixed sizing.
+- Bounded martingale recovery sizing remains available as an experiment but is disabled by default. It can double the base lot after losses for at most two steps, subject to the per-trade, daily-loss, drawdown, and margin guards. It cannot create a trading edge or guarantee recovery.
 - Estimates stop loss using `OrderCalcProfit`; fees, slippage, gaps, and fast-market execution can increase actual losses beyond that estimate.
 
 ## Important account-size limitation
 
-The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point stop (if `_Point` is 0.01), estimated stop loss is about $10, or 10% of a $100 account, before fees and slippage. Several losses can rapidly reduce the balance. A larger deposit in Strategy Tester is a simulation only and does not change the demo balance.
+The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point stop (if `_Point` is 0.01), estimated stop loss is about $10, or 10% of a $100 account, before fees and slippage. That exceeds the new 5% default cap, so the EA will skip this order unless the actual stop or lot is smaller. Several losses can rapidly reduce the balance. A larger deposit in Strategy Tester is a simulation only and does not change the demo balance.
 
 ## Install and test
 
 1. In MT5, choose **File → Open Data Folder → MQL5 → Experts**.
 2. Copy `XAU_Pro_EA.mq5` there and compile it in MetaEditor with **F7**.
-3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run. After recompiling, reset retained Inputs or explicitly set `Strategy=SCALP_ACTIVE` (numeric value 8), `EnableRecoverySizing=true`, `RecoveryMultiplier=2.0`, and `RecoveryMaxSteps=2`. Compare against `SCALP_PA` and a fixed-size run (`EnableRecoverySizing=false`) with identical risk, spread, commission, dates, and execution settings.
+3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization. After recompiling, reset retained Inputs or explicitly set `Strategy=SCALP_PA` (numeric value 7), `EnableRecoverySizing=false`, and `MaxRiskPercent=5`. Compare `SCALP_ACTIVE` separately, changing only the strategy input.
 4. Test with broker-appropriate spread, commission, swap, leverage, and execution delay. Review the Report, Equity graph, and Journal.
 5. Set Forward to `1/3` for an initial check and compare the Forward report separately. Compare win rate together with profit factor, expectancy, drawdown, and trade count. The EA has no fixed daily trade quota, allows one position at a time, and may have days with no valid setup. Backtests are not a guarantee of future performance.
 
@@ -42,4 +42,4 @@ For a separate dataset, use `--csv path.csv` or `--parquet path.parquet`. The cu
 
 ## Known research status
 
-The previously shared history had no strategy passing the project's IS/OOS consistency gate. User-shared runs of the stricter scalp mode showed positive aggregate results in selected test periods, but the Forward sample was too small to establish robustness. The active mode with bounded martingale has not been compiled or tested in MT5 yet. These changes are for controlled research, not a claim of profitability; MetaEditor compilation and fresh baseline/Forward runs are required.
+User-shared runs include an aggregate positive period for one configuration, but the latest active-mode report showed net loss USD 16.21 with PF 0.43 and its Forward result showed two losing trades totaling USD 20.90. This does not establish a robust edge. See [RESEARCH.md](RESEARCH.md) for the evidence review and validation plan. These changes are for controlled research, not a claim of profitability; MetaEditor compilation and fresh baseline/Forward runs are required.
