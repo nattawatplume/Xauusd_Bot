@@ -60,9 +60,9 @@ input double ActiveSlopeATR     = 0.01;   // M15 EMA20 slope over two closed bar
 input double ActiveVolMult      = 0.80;   // M5 signal-bar tick volume vs prior 20-bar mean
 input double ActiveTouchATR     = 0.35;   // pullback may touch EMA9 or EMA21 within this ATR band
 input int    ActiveBreakoutBars = 6;      // allow confirmed continuation close beyond recent range
-input bool   EnableRecoverySizing = false; // keep off until the base strategy passes out-of-sample tests
-input double RecoveryMultiplier  = 1.20;  // risk grows modestly after each loss
-input int    RecoveryMaxSteps     = 2;     // risk cap remains active at every step
+input bool   EnableRecoverySizing = true;  // bounded martingale: increase size after losses
+input double RecoveryMultiplier  = 2.00;  // double base lot after each consecutive loss
+input int    RecoveryMaxSteps     = 2;     // stop increasing after 2 steps; never bypass the risk cap
 
 //--- Break-even: เลื่อน SL มาหน้าทุน "หลังกำไรถึงระดับหนึ่งและถือมาระยะหนึ่ง"
 input bool   EnableBE           = false;   // session breakout backtest ไม่พบว่า BE ช่วยผล OOS
@@ -132,7 +132,8 @@ int OnInit()
       MinRiskATR <= 0 || MaxRiskATR < MinRiskATR ||
       MaxDailyLossPct <= 0 || MaxDailyLossPct >= 100 ||
       MaxTradesPerDay < 0 || MaxConsecLosses < 1 || PauseHoursAfterLoss < 0 ||
-      RecoveryMultiplier < 1.0 || RecoveryMaxSteps < 0 || PullbackVolMult < 0 ||
+      RecoveryMultiplier < 1.0 || RecoveryMultiplier > 2.0 ||
+      RecoveryMaxSteps < 0 || RecoveryMaxSteps > 2 || PullbackVolMult < 0 ||
       LotPer100USD <= 0 || ScalpMaxSLPoints < 1 || ScalpMinRR <= 0 ||
       ScalpMaxRR < ScalpMinRR || ScalpMinADX < 0 || ScalpMinTrendGapATR < 0 ||
       ScalpMinSlopeATR < 0 || ScalpVolMult < 0 || ActiveMinADX < 0 ||

@@ -15,7 +15,7 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 - Uses a structural stop with ATR bounds, a 1.5R initial target, and an 8-hour maximum holding time on M15.
 - Allows unlimited entries per broker day when `MaxTradesPerDay=0`, while still permitting only one EA position at a time.
 - Keeps daily-loss, peak-drawdown, spread, margin, and consecutive-loss cooldown protections enabled.
-- Includes optional bounded recovery sizing: 1.2x after each loss, at most two steps, subject to the hard per-trade risk cap. It is disabled by default. Enabling it does not guarantee recovery and can increase losses.
+- Enables bounded martingale recovery sizing by default: the base lot doubles after each consecutive loss, at most two steps (up to 4x base lot), then stops increasing. Every order still passes the hard 10% estimated per-trade risk cap, daily loss stop, peak drawdown stop, and four-loss cooldown. If the next size exceeds the risk or margin guard, the EA skips it. This can compound losses quickly and cannot guarantee recovery; disable `EnableRecoverySizing` to compare against fixed sizing.
 - Estimates stop loss using `OrderCalcProfit`; fees, slippage, gaps, and fast-market execution can increase actual losses beyond that estimate.
 
 ## Important account-size limitation
@@ -26,7 +26,7 @@ The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point
 
 1. In MT5, choose **File → Open Data Folder → MQL5 → Experts**.
 2. Copy `XAU_Pro_EA.mq5` there and compile it in MetaEditor with **F7**.
-3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run. After recompiling, explicitly set `Strategy=SCALP_ACTIVE` (numeric value 8) if MT5 retained old inputs. Compare against `SCALP_PA` with identical risk, spread, commission, dates, and execution settings.
+3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run. After recompiling, reset retained Inputs or explicitly set `Strategy=SCALP_ACTIVE` (numeric value 8), `EnableRecoverySizing=true`, `RecoveryMultiplier=2.0`, and `RecoveryMaxSteps=2`. Compare against `SCALP_PA` and a fixed-size run (`EnableRecoverySizing=false`) with identical risk, spread, commission, dates, and execution settings.
 4. Test with broker-appropriate spread, commission, swap, leverage, and execution delay. Review the Report, Equity graph, and Journal.
 5. Set Forward to `1/3` for an initial check and compare the Forward report separately. Compare win rate together with profit factor, expectancy, drawdown, and trade count. The EA has no fixed daily trade quota, allows one position at a time, and may have days with no valid setup. Backtests are not a guarantee of future performance.
 
@@ -42,4 +42,4 @@ For a separate dataset, use `--csv path.csv` or `--parquet path.parquet`. The cu
 
 ## Known research status
 
-The previously shared history had no strategy passing the project's IS/OOS consistency gate. User-shared runs of the stricter scalp mode showed positive aggregate results in selected test periods, but the Forward sample was too small to establish robustness. The active mode has not been compiled or tested in MT5 yet. These changes are for controlled research, not a claim of profitability; MetaEditor compilation and fresh baseline/Forward runs are required.
+The previously shared history had no strategy passing the project's IS/OOS consistency gate. User-shared runs of the stricter scalp mode showed positive aggregate results in selected test periods, but the Forward sample was too small to establish robustness. The active mode with bounded martingale has not been compiled or tested in MT5 yet. These changes are for controlled research, not a claim of profitability; MetaEditor compilation and fresh baseline/Forward runs are required.
