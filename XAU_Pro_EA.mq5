@@ -7,7 +7,7 @@
 //|        real ticks" > Symbol XAUUSD > ช่วงเวลา >= 2 ปี              |
 //+------------------------------------------------------------------+
 #property copyright "Nattawat"
-#property version   "1.60"
+#property version   "1.70"
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -22,11 +22,12 @@ enum ENUM_STRAT
    STRAT_EMA_CROSS        = 4,   // EMA ตัดกัน (กลยุทธ์เดิม ไว้เทียบ)
    STRAT_ALL_DAY_BOS      = 5,   // BOS + volume; ตรวจสัญญาณได้ทั้งวัน
    STRAT_DAYTRADE_COMBO   = 6,   // BOS, then trend-pullback fallback for more setups
-   STRAT_SCALP_PA         = 7    // M5 pullback/rejection with M15 trend filter
+   STRAT_SCALP_PA         = 7,   // Conservative M5 pullback/rejection baseline
+   STRAT_SCALP_ACTIVE     = 8    // More frequent M5 pullback + continuation with M15 bias
 };
 
 //--- ตั้งค่าทั่วไป
-input ENUM_STRAT      Strategy          = STRAT_SCALP_PA;
+input ENUM_STRAT      Strategy          = STRAT_SCALP_ACTIVE;
 input ENUM_TIMEFRAMES TF                = PERIOD_M5;
 input long            MagicNumber       = 234567;
 
@@ -53,6 +54,12 @@ input double ScalpMinADX        = 18.0;   // skip weak M15 trends; 0 disables th
 input double ScalpMinTrendGapATR= 0.10;   // M15 EMA20/50 separation as a fraction of ATR; 0 disables
 input double ScalpMinSlopeATR   = 0.02;   // M15 EMA20 slope over two closed bars; 0 disables
 input double ScalpVolMult       = 1.0;    // require signal-bar tick volume near/above its 20-bar mean
+input double ActiveMinADX       = 14.0;   // softer M15 trend strength floor for active mode
+input double ActiveTrendGapATR  = 0.05;   // M15 EMA20/50 gap as a fraction of ATR
+input double ActiveSlopeATR     = 0.01;   // M15 EMA20 slope over two closed bars
+input double ActiveVolMult      = 0.80;   // M5 signal-bar tick volume vs prior 20-bar mean
+input double ActiveTouchATR     = 0.35;   // pullback may touch EMA9 or EMA21 within this ATR band
+input int    ActiveBreakoutBars = 6;      // allow confirmed continuation close beyond recent range
 input bool   EnableRecoverySizing = false; // keep off until the base strategy passes out-of-sample tests
 input double RecoveryMultiplier  = 1.20;  // risk grows modestly after each loss
 input int    RecoveryMaxSteps     = 2;     // risk cap remains active at every step
@@ -128,7 +135,9 @@ int OnInit()
       RecoveryMultiplier < 1.0 || RecoveryMaxSteps < 0 || PullbackVolMult < 0 ||
       LotPer100USD <= 0 || ScalpMaxSLPoints < 1 || ScalpMinRR <= 0 ||
       ScalpMaxRR < ScalpMinRR || ScalpMinADX < 0 || ScalpMinTrendGapATR < 0 ||
-      ScalpMinSlopeATR < 0 || ScalpVolMult < 0 ||
+      ScalpMinSlopeATR < 0 || ScalpVolMult < 0 || ActiveMinADX < 0 ||
+      ActiveTrendGapATR < 0 || ActiveSlopeATR < 0 || ActiveVolMult < 0 ||
+      ActiveTouchATR < 0 || ActiveBreakoutBars < 2 ||
       StartHour < 0 || StartHour > 23 || EndHour < 1 || EndHour > 24 || StartHour >= EndHour)
    {
       Print("ค่าตั้งต้นไม่ถูกต้อง: ตรวจ Risk/RR/ATR/เวลา/Recovery ก่อนเริ่ม EA");
@@ -653,6 +662,97 @@ int SignalScalpPA()
    return 0;
 }
 
+// Active variant: retain a closed-bar M15 directional bias and risk guards,
+// but recognize both a wider EMA pullback and a confirmed short-range continuation.
+int SignalScalpActive()
+{
+   double atr = Buf(hATR, 1);
+   double emaFast = Buf(hCrossFast, 1), emaSlow = Buf(hCrossSlow, 1);
+   if(atr == EMPTY_VALUE || atr <= 0 || emaFast == EMPTY_VALUE || emaSlow == EMPTY_VALUE)
+      return 0;
+
+   datetime signalTime = iTime(_Symbol, TF, 1);
+   int trendShift = iBarShift(_Symbol, PERIOD_M15, signalTime, false) + 1;
+   if(trendShift < 1) return 0;
+   double trendFast = Buf(hScalpTrendFast, trendShift);
+   double trendSlow = Buf(hScalpTrendSlow, trendShift);
+   double trendFastOld = Buf(hScalpTrendFast, trendShift + 2);
+   double trendATR = Buf(hScalpATR, trendShift);
+   double trendADX = Buf(hScalpADX, trendShift, 0);
+   if(trendFast == EMPTY_VALUE || trendSlow == EMPTY_VALUE || trendFastOld == EMPTY_VALUE ||
+      trendATR == EMPTY_VALUE || trendATR <= 0 || trendADX == EMPTY_VALUE || trendFast == trendSlow)
+      return 0;
+   if(ActiveMinADX > 0 && trendADX < ActiveMinADX) return 0;
+   if(ActiveTrendGapATR > 0 && MathAbs(trendFast - trendSlow) / trendATR < ActiveTrendGapATR)
+      return 0;
+
+   int trend = trendFast > trendSlow ? 1 : -1;
+   double slope = (trendFast - trendFastOld) / trendATR;
+   if(ActiveSlopeATR > 0 && trend * slope < ActiveSlopeATR) return 0;
+
+   double o1 = iOpen(_Symbol, TF, 1), c1 = iClose(_Symbol, TF, 1);
+   double h1 = iHigh(_Symbol, TF, 1), l1 = iLow(_Symbol, TF, 1);
+   double o2 = iOpen(_Symbol, TF, 2), c2 = iClose(_Symbol, TF, 2);
+   double h2 = iHigh(_Symbol, TF, 2), l2 = iLow(_Symbol, TF, 2);
+   double range = h1 - l1;
+   if(range <= 0) return 0;
+
+   double body = MathAbs(c1 - o1);
+   double lowerWick = MathMin(o1, c1) - l1;
+   double upperWick = h1 - MathMax(o1, c1);
+   bool bullReject = c1 > o1 && lowerWick >= MathMax(body, _Point) && c1 >= l1 + 0.55 * range;
+   bool bearReject = c1 < o1 && upperWick >= MathMax(body, _Point) && c1 <= h1 - 0.55 * range;
+   bool bullEngulf = c1 > o1 && c2 < o2 && c1 >= o2 && o1 <= c2;
+   bool bearEngulf = c1 < o1 && c2 > o2 && c1 <= o2 && o1 >= c2;
+   bool bullMomentum = c1 > o1 && body >= 0.35 * range && c1 >= l1 + 0.72 * range;
+   bool bearMomentum = c1 < o1 && body >= 0.35 * range && c1 <= h1 - 0.72 * range;
+
+   double volSum = 0;
+   for(int k = 2; k <= 21; k++) volSum += (double)iTickVolume(_Symbol, TF, k);
+   if(volSum <= 0) return 0;
+   double volAverage = volSum / 20.0;
+   if((double)iTickVolume(_Symbol, TF, 1) < ActiveVolMult * volAverage) return 0;
+
+   int rangeHighShift = iHighest(_Symbol, TF, MODE_HIGH, ActiveBreakoutBars, 2);
+   int rangeLowShift = iLowest(_Symbol, TF, MODE_LOW, ActiveBreakoutBars, 2);
+   if(rangeHighShift < 0 || rangeLowShift < 0) return 0;
+   double rangeHigh = iHigh(_Symbol, TF, rangeHighShift);
+   double rangeLow = iLow(_Symbol, TF, rangeLowShift);
+
+   bool buyPullback = trend > 0 && emaFast > emaSlow &&
+      (l1 <= emaFast + ActiveTouchATR * atr || l1 <= emaSlow + ActiveTouchATR * atr) &&
+      c1 > emaFast && (bullReject || bullEngulf || bullMomentum);
+   bool sellPullback = trend < 0 && emaFast < emaSlow &&
+      (h1 >= emaFast - ActiveTouchATR * atr || h1 >= emaSlow - ActiveTouchATR * atr) &&
+      c1 < emaFast && (bearReject || bearEngulf || bearMomentum);
+   bool buyContinuation = trend > 0 && emaFast > emaSlow && c1 > rangeHigh && bullMomentum;
+   bool sellContinuation = trend < 0 && emaFast < emaSlow && c1 < rangeLow && bearMomentum;
+
+   if(buyPullback || buyContinuation)
+   {
+      signalStructSL = MathMin(MathMin(l1, l2), iLow(_Symbol, TF, 3)) - 0.15 * atr;
+      int resistance = iHighest(_Symbol, TF, MODE_HIGH, 24, 2);
+      if(resistance >= 0)
+      {
+         double level = iHigh(_Symbol, TF, resistance);
+         if(level > c1) signalStructTP = level;
+      }
+      return 1;
+   }
+   if(sellPullback || sellContinuation)
+   {
+      signalStructSL = MathMax(MathMax(h1, h2), iHigh(_Symbol, TF, 3)) + 0.15 * atr;
+      int support = iLowest(_Symbol, TF, MODE_LOW, 24, 2);
+      if(support >= 0)
+      {
+         double level = iLow(_Symbol, TF, support);
+         if(level < c1) signalStructTP = level;
+      }
+      return -1;
+   }
+   return 0;
+}
+
 int SignalAutoAdaptive()
 {
    // 1) สภาวะตลาดเปิดรอบลอนดอน/นิวยอร์ก: ตรวจสอบ Session Breakout ก่อนเป็นอันดับแรก
@@ -711,6 +811,7 @@ int GetSignal()
       case STRAT_ALL_DAY_BOS:      return SignalAllDayBOS();
       case STRAT_DAYTRADE_COMBO:   return SignalDayTradeCombo();
       case STRAT_SCALP_PA:         return SignalScalpPA();
+      case STRAT_SCALP_ACTIVE:     return SignalScalpActive();
    }
    return 0;
 }
@@ -795,7 +896,8 @@ void OpenTrade(int dir)
    slDist = MathMax(slDist, MinRiskATR * atr);
    double minDist = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
    slDist = MathMax(slDist, minDist);
-   if(Strategy == STRAT_SCALP_PA && slDist / _Point > ScalpMaxSLPoints)
+   bool scalpMode = (Strategy == STRAT_SCALP_PA || Strategy == STRAT_SCALP_ACTIVE);
+   if(scalpMode && slDist / _Point > ScalpMaxSLPoints)
    {
       PrintFormat("ข้าม scalp: SL %.0f points เกินเพดาน %d points", slDist / _Point, ScalpMaxSLPoints);
       return;
@@ -809,15 +911,21 @@ void OpenTrade(int dir)
 
    double sl = entry - dir * slDist;
    double targetDist = slDist * RR;
-   if(Strategy == STRAT_SCALP_PA)
+   if(scalpMode)
    {
       double structuralTargetDist = dir * (signalStructTP - entry);
       if(structuralTargetDist < slDist * ScalpMinRR)
       {
-         PrintFormat("ข้าม scalp: แนวรับ/ต้านใกล้เกินไปสำหรับเป้าหมายขั้นต่ำ %.2fR", ScalpMinRR);
-         return;
+         if(Strategy == STRAT_SCALP_ACTIVE && signalStructTP <= 0)
+            targetDist = slDist * ScalpMinRR; // no forward structure: use the configured minimum-R target
+         else
+         {
+            PrintFormat("ข้าม scalp: แนวรับ/ต้านใกล้เกินไปสำหรับเป้าหมายขั้นต่ำ %.2fR", ScalpMinRR);
+            return;
+         }
       }
-      targetDist = MathMin(structuralTargetDist, slDist * ScalpMaxRR);
+      else
+         targetDist = MathMin(structuralTargetDist, slDist * ScalpMaxRR);
    }
    double tp = entry + dir * targetDist;
    datetime lastClose;
