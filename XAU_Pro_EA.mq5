@@ -7,7 +7,7 @@
 //|        real ticks" > Symbol XAUUSD > ช่วงเวลา >= 2 ปี              |
 //+------------------------------------------------------------------+
 #property copyright "Nattawat"
-#property version   "1.50"
+#property version   "1.60"
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -21,21 +21,22 @@ enum ENUM_STRAT
    STRAT_SESSION_BREAKOUT = 3,   // เบรกกรอบเอเชีย
    STRAT_EMA_CROSS        = 4,   // EMA ตัดกัน (กลยุทธ์เดิม ไว้เทียบ)
    STRAT_ALL_DAY_BOS      = 5,   // BOS + volume; ตรวจสัญญาณได้ทั้งวัน
-   STRAT_DAYTRADE_COMBO   = 6    // BOS, then trend-pullback fallback for more setups
+   STRAT_DAYTRADE_COMBO   = 6,   // BOS, then trend-pullback fallback for more setups
+   STRAT_SCALP_PA         = 7    // M5 pullback/rejection with M15 trend filter
 };
 
 //--- ตั้งค่าทั่วไป
-input ENUM_STRAT      Strategy          = STRAT_DAYTRADE_COMBO;
-input ENUM_TIMEFRAMES TF                = PERIOD_M15;
+input ENUM_STRAT      Strategy          = STRAT_SCALP_PA;
+input ENUM_TIMEFRAMES TF                = PERIOD_M5;
 input long            MagicNumber       = 234567;
 
 //--- risk-based money management; minimum volume can exceed the cap on a $100 account
-input double RiskPercent        = 0.25;   // base risk target percent per trade
-input double MaxRiskPercent     = 0.50;   // hard per-trade risk cap, including recovery sizing
+input double MaxRiskPercent     = 10.0;   // hard per-trade loss cap, including estimated stop loss
+input double LotPer100USD       = 0.01;   // $100 equity -> 0.01 lot; actual risk is checked before entry
 input double MaxMarginUsePct    = 50.0;   // margin ของไม้นี้ต้องไม่เกิน % ของ free margin
 input double SL_ATR_Mult        = 1.0;    // fallback SL = ATR x ค่านี้
 input double MaxSL_USD          = 0.0;    // zero disables the absolute price cap
-input double RR                 = 1.5;    // target in multiples of initial risk
+input double RR                 = 1.5;    // fallback target for non-scalp strategies
 input int    ATR_Period         = 14;
 input double SL_BufferATR       = 0.1;
 input double MinRiskATR         = 1.0;
@@ -44,7 +45,11 @@ input double SessionVolMult     = 0.0;    // 0=off; match this to the winning ba
 input double BOSVolMult         = 2.0;    // candidate variant; not proven profitable out of sample
 input double PullbackVolMult    = 1.2;    // volume confirmation for the day-trade pullback leg
 input bool   BOSUseH1Trend      = false;  // variant OOS บวกล่าสุดเลือกแบบไม่ใช้ H1 แต่ IS ยังติดลบ
-input int    MaxHoldBars        = 32;     // ถือเกินกี่แท่งให้ปิด (32 แท่ง M15 = 8 ชม.)
+input int    MaxHoldBars        = 12;     // 12 แท่ง M5 = 1 ชั่วโมง
+input int    ScalpMaxSLPoints   = 1000;   // scalp entries wider than this are skipped
+input double ScalpMinRR         = 1.0;    // skip when nearest structure offers less than this R
+input double ScalpMaxRR         = 2.0;    // cap structural target at this R
+input double ScalpVolMult       = 0.8;    // modest tick-volume confirmation for scalp signals
 input bool   EnableRecoverySizing = false; // keep off until the base strategy passes out-of-sample tests
 input double RecoveryMultiplier  = 1.20;  // risk grows modestly after each loss
 input int    RecoveryMaxSteps     = 2;     // risk cap remains active at every step
@@ -87,10 +92,11 @@ input int    BreakoutEndHour    = 15;
 
 //--- handles
 int hATR, hEmaFast, hEmaSlow, hRSI, hADX, hCrossFast, hCrossSlow;
-int hTrendFastH1, hTrendSlowH1, hPullbackEMA;
+int hTrendFastH1, hTrendSlowH1, hPullbackEMA, hScalpTrendFast, hScalpTrendSlow;
 datetime lastBarTime   = 0;
 int      lastTradeDay  = -1;
 double   signalStructSL = 0;
+double   signalStructTP = 0;
 int      dayKey        = -1;
 double   dayStartEquity = 0;
 
@@ -110,12 +116,14 @@ string GVDailyEquity(int key)
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   if(RiskPercent <= 0 || MaxRiskPercent < RiskPercent || MaxRiskPercent <= 0 ||
+   if(MaxRiskPercent <= 0 || MaxRiskPercent > 10.0 ||
       RR <= 0 || ATR_Period < 1 || MaxHoldBars < 1 ||
       MinRiskATR <= 0 || MaxRiskATR < MinRiskATR ||
       MaxDailyLossPct <= 0 || MaxDailyLossPct >= 100 ||
       MaxTradesPerDay < 0 || MaxConsecLosses < 1 || PauseHoursAfterLoss < 0 ||
       RecoveryMultiplier < 1.0 || RecoveryMaxSteps < 0 || PullbackVolMult < 0 ||
+      LotPer100USD <= 0 || ScalpMaxSLPoints < 1 || ScalpMinRR <= 0 ||
+      ScalpMaxRR < ScalpMinRR || ScalpVolMult < 0 ||
       StartHour < 0 || StartHour > 23 || EndHour < 1 || EndHour > 24 || StartHour >= EndHour)
    {
       Print("ค่าตั้งต้นไม่ถูกต้อง: ตรวจ Risk/RR/ATR/เวลา/Recovery ก่อนเริ่ม EA");
@@ -132,11 +140,14 @@ int OnInit()
    hTrendFastH1 = iMA(_Symbol, PERIOD_H1, EMA_Fast, 0, MODE_EMA, PRICE_CLOSE);
    hTrendSlowH1 = iMA(_Symbol, PERIOD_H1, EMA_Slow, 0, MODE_EMA, PRICE_CLOSE);
    hPullbackEMA = iMA(_Symbol, TF, 21, 0, MODE_EMA, PRICE_CLOSE);
+   hScalpTrendFast = iMA(_Symbol, PERIOD_M15, 20, 0, MODE_EMA, PRICE_CLOSE);
+   hScalpTrendSlow = iMA(_Symbol, PERIOD_M15, 50, 0, MODE_EMA, PRICE_CLOSE);
 
    if(hATR==INVALID_HANDLE || hEmaFast==INVALID_HANDLE || hEmaSlow==INVALID_HANDLE ||
       hRSI==INVALID_HANDLE || hADX==INVALID_HANDLE || hCrossFast==INVALID_HANDLE ||
       hCrossSlow==INVALID_HANDLE || hTrendFastH1==INVALID_HANDLE || hTrendSlowH1==INVALID_HANDLE ||
-      hPullbackEMA==INVALID_HANDLE)
+      hPullbackEMA==INVALID_HANDLE || hScalpTrendFast==INVALID_HANDLE ||
+      hScalpTrendSlow==INVALID_HANDLE)
    {
       Print("สร้าง indicator ไม่สำเร็จ");
       return INIT_FAILED;
@@ -159,6 +170,7 @@ void OnDeinit(const int reason)
    IndicatorRelease(hCrossFast);IndicatorRelease(hCrossSlow);
    IndicatorRelease(hTrendFastH1); IndicatorRelease(hTrendSlowH1);
    IndicatorRelease(hPullbackEMA);
+   IndicatorRelease(hScalpTrendFast); IndicatorRelease(hScalpTrendSlow);
 }
 
 //+------------------------------------------------------------------+
@@ -564,6 +576,62 @@ int SignalDayTradeCombo()
    return SignalPullbackPA();
 }
 
+int SignalScalpPA()
+{
+   double atr = Buf(hATR, 1);
+   double emaFast = Buf(hCrossFast, 1), emaSlow = Buf(hCrossSlow, 1);
+   if(atr == EMPTY_VALUE || atr <= 0 || emaFast == EMPTY_VALUE || emaSlow == EMPTY_VALUE)
+      return 0;
+
+   datetime signalTime = iTime(_Symbol, TF, 1);
+   int trendShift = iBarShift(_Symbol, PERIOD_M15, signalTime, false) + 1;
+   if(trendShift < 1) return 0;
+   double trendFast = Buf(hScalpTrendFast, trendShift);
+   double trendSlow = Buf(hScalpTrendSlow, trendShift);
+   if(trendFast == EMPTY_VALUE || trendSlow == EMPTY_VALUE || trendFast == trendSlow) return 0;
+
+   double o1 = iOpen(_Symbol, TF, 1), c1 = iClose(_Symbol, TF, 1);
+   double h1 = iHigh(_Symbol, TF, 1), l1 = iLow(_Symbol, TF, 1);
+   double o2 = iOpen(_Symbol, TF, 2), c2 = iClose(_Symbol, TF, 2);
+   double h2 = iHigh(_Symbol, TF, 2), l2 = iLow(_Symbol, TF, 2);
+   double range = h1 - l1;
+   if(range <= 0) return 0;
+
+   double body = MathAbs(c1 - o1);
+   double lowerWick = MathMin(o1, c1) - l1;
+   double upperWick = h1 - MathMax(o1, c1);
+   bool bullReject = c1 > o1 && lowerWick >= MathMax(body, _Point) && c1 >= l1 + 0.60 * range;
+   bool bearReject = c1 < o1 && upperWick >= MathMax(body, _Point) && c1 <= h1 - 0.60 * range;
+   bool bullEngulf = c1 > o1 && c2 < o2 && c1 >= o2 && o1 <= c2;
+   bool bearEngulf = c1 < o1 && c2 > o2 && c1 <= o2 && o1 >= c2;
+
+   double volSum = 0;
+   for(int k = 2; k <= 21; k++) volSum += (double)iTickVolume(_Symbol, TF, k);
+   if(volSum <= 0) return 0;
+   double volAverage = volSum / 20.0;
+   if((double)iTickVolume(_Symbol, TF, 1) < ScalpVolMult * volAverage) return 0;
+
+   bool buy = trendFast > trendSlow && emaFast > emaSlow &&
+              l1 <= emaFast + 0.20 * atr && c1 > emaFast && (bullReject || bullEngulf);
+   bool sell = trendFast < trendSlow && emaFast < emaSlow &&
+               h1 >= emaFast - 0.20 * atr && c1 < emaFast && (bearReject || bearEngulf);
+   if(buy)
+   {
+      signalStructSL = MathMin(MathMin(l1, l2), iLow(_Symbol, TF, 3)) - 0.15 * atr;
+      int resistance = iHighest(_Symbol, TF, MODE_HIGH, 24, 2);
+      if(resistance >= 0) signalStructTP = iHigh(_Symbol, TF, resistance);
+      return 1;
+   }
+   if(sell)
+   {
+      signalStructSL = MathMax(MathMax(h1, h2), iHigh(_Symbol, TF, 3)) + 0.15 * atr;
+      int support = iLowest(_Symbol, TF, MODE_LOW, 24, 2);
+      if(support >= 0) signalStructTP = iLow(_Symbol, TF, support);
+      return -1;
+   }
+   return 0;
+}
+
 int SignalAutoAdaptive()
 {
    // 1) สภาวะตลาดเปิดรอบลอนดอน/นิวยอร์ก: ตรวจสอบ Session Breakout ก่อนเป็นอันดับแรก
@@ -621,6 +689,7 @@ int GetSignal()
       case STRAT_EMA_CROSS:        return SignalEmaCross();
       case STRAT_ALL_DAY_BOS:      return SignalAllDayBOS();
       case STRAT_DAYTRADE_COMBO:   return SignalDayTradeCombo();
+      case STRAT_SCALP_PA:         return SignalScalpPA();
    }
    return 0;
 }
@@ -629,7 +698,7 @@ int GetSignal()
 //| คำนวณ lot จาก % ความเสี่ยงและระยะ SL                               |
 //| พอร์ตเล็ก: ถ้า lot ต่ำสุดยังเสี่ยงเกินเพดาน -> คืน 0 (ข้ามไม้)           |
 //+------------------------------------------------------------------+
-double CalcLot(double slDistance, int dir, double entryPrice, double tradeRiskPct)
+double CalcLot(double slDistance, int dir, double entryPrice, double lotMultiplier)
 {
    double balance   = AccountInfoDouble(ACCOUNT_BALANCE);
    if(balance <= 0 || slDistance <= 0 || entryPrice <= 0) return 0;
@@ -648,8 +717,9 @@ double CalcLot(double slDistance, int dir, double entryPrice, double tradeRiskPc
    }
    double lossPerLot = MathAbs(estimatedProfit);                 // account currency at 1.00 lot
    if(lossPerLot <= 0) return 0;
-   tradeRiskPct = MathMin(tradeRiskPct, MaxRiskPercent);
-   double lot  = (balance * tradeRiskPct / 100.0) / lossPerLot;
+   // Equity scaling: $100 -> 0.01 lot, $200 -> 0.02 lot, etc.
+   // The estimated stop loss remains subject to the hard MaxRiskPercent guard below.
+   double lot = (balance / 100.0) * LotPer100USD * MathMax(1.0, lotMultiplier);
    double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
    double vmin = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
    double vmax = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
@@ -704,6 +774,11 @@ void OpenTrade(int dir)
    slDist = MathMax(slDist, MinRiskATR * atr);
    double minDist = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
    slDist = MathMax(slDist, minDist);
+   if(Strategy == STRAT_SCALP_PA && slDist / _Point > ScalpMaxSLPoints)
+   {
+      PrintFormat("ข้าม scalp: SL %.0f points เกินเพดาน %d points", slDist / _Point, ScalpMaxSLPoints);
+      return;
+   }
    if(slDist > MaxRiskATR * atr || (MaxSL_USD > 0 && slDist > MaxSL_USD))
    {
       PrintFormat("ข้ามไม้: structural SL กว้าง %.2f (ATR %.2f, limit %.1fxATR)",
@@ -712,15 +787,25 @@ void OpenTrade(int dir)
    }
 
    double sl = entry - dir * slDist;
-   double tp = entry + dir * slDist * RR;
+   double targetDist = slDist * RR;
+   if(Strategy == STRAT_SCALP_PA)
+   {
+      double structuralTargetDist = dir * (signalStructTP - entry);
+      if(structuralTargetDist < slDist * ScalpMinRR)
+      {
+         PrintFormat("ข้าม scalp: แนวรับ/ต้านใกล้เกินไปสำหรับเป้าหมายขั้นต่ำ %.2fR", ScalpMinRR);
+         return;
+      }
+      targetDist = MathMin(structuralTargetDist, slDist * ScalpMaxRR);
+   }
+   double tp = entry + dir * targetDist;
    datetime lastClose;
    int lossStreak = ConsecLosses(lastClose);
    int recoveryLevel = EnableRecoverySizing
                        ? (int)MathMin((double)lossStreak, (double)MathMax(0, RecoveryMaxSteps))
                        : 0;
-   double tradeRiskPct = RiskPercent * MathPow(MathMax(1.0, RecoveryMultiplier), recoveryLevel);
-   tradeRiskPct = MathMin(tradeRiskPct, MaxRiskPercent);
-   double lot = CalcLot(slDist, dir, entry, tradeRiskPct);
+   double lotMultiplier = MathPow(MathMax(1.0, RecoveryMultiplier), recoveryLevel);
+   double lot = CalcLot(slDist, dir, entry, lotMultiplier);
    if(lot <= 0) return;
 
    bool ok = false;
@@ -763,6 +848,7 @@ void OnTick()
    if(!FiltersOK())  return;
 
    signalStructSL = 0;
+   signalStructTP = 0;
    int sig = GetSignal();
    if(sig != 0) OpenTrade(sig);
 }

@@ -4,24 +4,28 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 
 ## Current EA behavior
 
-- Default symbol is the chart symbol; attach the EA to the broker's XAUUSD symbol on M15.
+- The default mode is `SCALP_PA` on M5, using an M15 trend filter. Other experimental strategies remain selectable.
+- Scalping entries require a pullback/rejection or engulfing candle aligned with the M15 EMA trend, plus tick-volume confirmation. It may skip many bars and cannot guarantee a fixed trade cadence.
+- The target is the nearest recent support/resistance level, capped at 2R; entries are skipped if that level offers less than 1R. Maximum holding time is 12 M5 bars (one hour).
+- Volume scales at 0.01 lot per $100 equity (so $100 targets 0.01 lot), rounded down to the broker's volume step. The EA skips the order if estimated loss at the stop exceeds the 10% per-trade cap or margin is insufficient.
+- Scalping stops wider than 1,000 symbol points are skipped. Check the broker's XAUUSD digits and point size; 1,000 points equals $10 only when `_Point` is 0.01.
 - Default day-trade mode tries volume-confirmed BOS first, then an H1-trend / EMA21 rejection pullback with volume confirmation to add setups. The combined mode has not yet passed an independent backtest.
 - BOS uses a 2.0 tick-volume threshold and no H1 direction filter.
 - Uses a structural stop with ATR bounds, a 1.5R initial target, and an 8-hour maximum holding time on M15.
 - Allows unlimited entries per broker day when `MaxTradesPerDay=0`, while still permitting only one EA position at a time.
 - Keeps daily-loss, peak-drawdown, spread, margin, and consecutive-loss cooldown protections enabled.
-- Includes optional bounded recovery sizing: 1.2x after each loss, at most two steps, subject to a hard 0.50% per-trade risk cap. It is disabled by default because the base strategy has not passed out-of-sample validation. Enabling it does not guarantee recovery and can increase losses.
-- Calculates volume using `OrderCalcProfit` at the proposed stop, then skips the trade when the broker's minimum lot would exceed the risk cap.
+- Includes optional bounded recovery sizing: 1.2x after each loss, at most two steps, subject to the hard per-trade risk cap. It is disabled by default. Enabling it does not guarantee recovery and can increase losses.
+- Estimates stop loss using `OrderCalcProfit`; fees, slippage, gaps, and fast-market execution can increase actual losses beyond that estimate.
 
 ## Important account-size limitation
 
-The FBS demo account previously shown has USD 100. Gold's minimum volume may risk more than the EA's 0.50% cap at that balance. In that case the EA will correctly skip entries. Do not raise the risk cap just to force trades. A larger deposit in Strategy Tester is a simulation only and does not change the demo balance.
+The FBS demo account previously shown has USD 100. At 0.01 lot and a 1,000-point stop (if `_Point` is 0.01), estimated stop loss is about $10, or 10% of a $100 account, before fees and slippage. Several losses can rapidly reduce the balance. A larger deposit in Strategy Tester is a simulation only and does not change the demo balance.
 
 ## Install and test
 
 1. In MT5, choose **File → Open Data Folder → MQL5 → Experts**.
 2. Copy `XAU_Pro_EA.mq5` there and compile it in MetaEditor with **F7**.
-3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M15, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run.
+3. In Strategy Tester select the compiled EA, broker XAUUSD symbol, M5, **Every tick based on real ticks**, a multi-year custom date range, and disable optimization for the baseline run. After recompiling, reset Inputs to the EA defaults so the new scalp mode is selected.
 4. Test with broker-appropriate spread, commission, swap, leverage, and execution delay. Review the Report, Equity graph, and Journal.
 5. Compare the EA tester with the Python backtest before any forward demo trial. Backtests are not a guarantee of future performance.
 
