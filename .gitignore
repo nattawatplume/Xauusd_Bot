@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.ex5
+*.log
+*.set
+*.parquet
+*.csv
+result*.txt
+v2_h1.txt
+tiers.txt
+Xauusd_Bot-main/
+XAU_BOS_EA.mq5
+backtest_xau.py
