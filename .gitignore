@@ -1,6 +1,11 @@
 .venv/
 __pycache__/
 *.py[cod]
+.env
+**/.env
+AI_XAU_V1/service/.venv/
+AI_XAU_V1/service/runtime/*.log
+AI_XAU_V1/service/runtime/decisions.jsonl
 *.ex5
 *.log
 *.set
