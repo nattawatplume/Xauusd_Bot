@@ -11,6 +11,8 @@ AI_XAU_V1/service/runtime/decisions.jsonl
 *.set
 *.parquet
 *.csv
+cloud_ai_trader/data/*.db
+cloud_ai_trader/.env
 result*.txt
 v2_h1.txt
 tiers.txt

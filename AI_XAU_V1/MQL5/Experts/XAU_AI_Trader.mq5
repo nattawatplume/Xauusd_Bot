@@ -1,4 +1,4 @@
-﻿//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //| XAU_AI_Trader.mq5                                                |
 //| Local AI-assisted XAUUSD day-trading EA                          |
 //|                                                                  |
@@ -31,7 +31,7 @@ input ENUM_STRAT      Strategy          = STRAT_SCALP_PA;
 input ENUM_TIMEFRAMES TF                = PERIOD_M5;
 input long            MagicNumber       = 234568; // separate from the legacy EA so they cannot manage each other's trades
 
-//--- Local AI bridge: Ollama + the Python service must run on this PC/VPS.
+//--- AI bridge: use loopback HTTP locally, or HTTPS for a remote Cloud VPS.
 input bool   AIEnableTrading           = false; // orders are sent only after this is explicitly enabled
 input bool   AIShadowMode              = true;  // ask AI and log signals, but never place an order
 input bool   EnableLegacySignalFallback= false; // leave false: this new EA should not silently use old rules
@@ -177,9 +177,10 @@ int OnInit()
    {
       bool loopbackURL = StringFind(AIBridgeURL, "http://127.0.0.1:") == 0 ||
                          StringFind(AIBridgeURL, "http://localhost:") == 0;
-      if(!loopbackURL || AIBridgeToken == "change-this-local-token" || StringLen(AIBridgeToken) < 24)
+      bool secureRemoteURL = StringFind(AIBridgeURL, "https://") == 0;
+      if((!loopbackURL && !secureRemoteURL) || AIBridgeToken == "change-this-local-token" || StringLen(AIBridgeToken) < 32)
       {
-         Print("ตั้งค่า AI bridge ไม่ปลอดภัย: ใช้ URL localhost และ token ลับอย่างน้อย 24 ตัวอักษร");
+         Print("ตั้งค่า AI bridge ไม่ปลอดภัย: ใช้ HTTP เฉพาะ localhost หรือ HTTPS สำหรับ remote และ token ลับอย่างน้อย 32 ตัวอักษร");
          return INIT_PARAMETERS_INCORRECT;
       }
    }
@@ -1285,5 +1286,48 @@ void OnTick()
    signalStructTP = 0;
    int sig = GetSignal();
    if(sig != 0) OpenTrade(sig);
+}
+
+//+------------------------------------------------------------------+
+//| แจ้งเตือนเมื่อไม้ปิดไปยัง Cloud AI เพื่อทำ Reflection และการเรียนรู้  |
+//+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction& trans,
+                         const MqlTradeRequest& request,
+                         const MqlTradeResult& result)
+{
+   if(trans.type == TRADE_TRANSACTION_DEAL_ADD)
+   {
+      ulong dealTicket = trans.deal;
+      if(HistoryDealSelect(dealTicket))
+      {
+         long magic = HistoryDealGetInteger(dealTicket, DEAL_MAGIC);
+         long entry = HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
+         string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+         if(magic == MagicNumber && entry == DEAL_ENTRY_OUT && symbol == _Symbol)
+         {
+            double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+            double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+            datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+
+            string payload = StringFormat(
+               "{\"ticket\":%I64u,\"symbol\":\"%s\",\"close_price\":%.2f,\"pnl_usd\":%.2f,\"close_time\":\"%s\"}",
+               dealTicket, symbol, closePrice, profit, TimeToString(closeTime, TIME_DATE|TIME_SECONDS)
+            );
+
+            char req[], resp[];
+            StringToCharArray(payload, req, 0, WHOLE_ARRAY, CP_UTF8);
+            if(ArraySize(req) > 0) ArrayResize(req, ArraySize(req) - 1);
+            string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
+            string respHeaders;
+
+            string closeUrl = AIBridgeURL;
+            StringReplace(closeUrl, "/v1/decision", "/v1/trade_closed");
+
+            ResetLastError();
+            int status = WebRequest("POST", closeUrl, headers, 5000, req, resp, respHeaders);
+            PrintFormat("Cloud AI Trade Reflection sent: ticket=%I64u status=%d profit=%.2f", dealTicket, status, profit);
+         }
+      }
+   }
 }
 //+------------------------------------------------------------------+
