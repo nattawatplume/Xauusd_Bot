@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧠 XAU Cloud AI Trader Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent flex items-center gap-2">
+          <span>🧠</span> XAU Cloud AI Trader
+        </h1>
+        <p class="text-sm text-slate-400 mt-1">Autonomous Self-Learning Gold Trading Intelligence</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="shadowBadge" class="px-3 py-1 text-xs rounded-full bg-amber-900/60 text-amber-300 border border-amber-600/40">
+          SHADOW MODE
+        </span>
+        <span id="statusBadge" class="px-3 py-1 text-xs rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-600/40 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
+        </span>
+      </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs text-slate-400">Total Trades</div>
+        <div id="statTotal" class="text-2xl font-bold mt-1 text-slate-100">0</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs text-slate-400">Win Rate</div>
+        <div id="statWinRate" class="text-2xl font-bold mt-1 text-slate-100">0.0%</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs text-slate-400">Net Profit (USD)</div>
+        <div id="statPnlUsd" class="text-2xl font-bold mt-1 text-slate-100">$0.00</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs text-slate-400">Net Return (R)</div>
+        <div id="statPnlR" class="text-2xl font-bold mt-1 text-slate-100">+0.0R</div>
+      </div>
+    </div>
+
+    <!-- Main Grid: Recent Decisions & Active Knowledge -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+
+      <!-- Left Column: AI Decision Stream (2 Cols) -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+            <span>⚡</span> Realtime AI Decisions
+          </h2>
+          <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left text-sm">
+              <thead class="text-xs uppercase bg-slate-800/60 text-slate-400">
+                <tr>
+                  <th class="p-2.5">Bar Time</th>
+                  <th class="p-2.5">Action</th>
+                  <th class="p-2.5">Regime</th>
+                  <th class="p-2.5">Conf</th>
+                  <th class="p-2.5">Reason</th>
+                </tr>
+              </thead>
+              <tbody id="decisionsTable" class="divide-y divide-slate-800 text-xs">
+                <tr>
+                  <td colspan="5" class="p-4 text-center text-slate-500">Waiting for market snapshots from MT5...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+            <span>📊</span> Trade History
+          </h2>
+          <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left text-sm">
+              <thead class="text-xs uppercase bg-slate-800/60 text-slate-400">
+                <tr>
+                  <th class="p-2.5">Ticket</th>
+                  <th class="p-2.5">Type</th>
+                  <th class="p-2.5">Entry</th>
+                  <th class="p-2.5">Exit</th>
+                  <th class="p-2.5">PnL ($)</th>
+                  <th class="p-2.5">PnL (R)</th>
+                </tr>
+              </thead>
+              <tbody id="tradesTable" class="divide-y divide-slate-800 text-xs">
+                <tr>
+                  <td colspan="6" class="p-4 text-center text-slate-500">No trades recorded yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Self-Learning Knowledge Base (1 Col) -->
+      <div class="space-y-6">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+            <span>📖</span> AI Knowledge & Rules
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">กฎและหลักคิดที่ AI ปรับปรุงตัวเองอย่างต่อเนื่อง</p>
+
+          <div class="mt-4 space-y-3">
+            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs" open>
+              <summary class="font-medium text-amber-300 cursor-pointer">📜 Current Trading Rules</summary>
+              <pre id="knowledgeRules" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading rules...</pre>
+            </details>
+
+            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs">
+              <summary class="font-medium text-amber-300 cursor-pointer">🎯 Strategy Preferences</summary>
+              <pre id="knowledgePrefs" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading preferences...</pre>
+            </details>
+
+            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs">
+              <summary class="font-medium text-amber-300 cursor-pointer">💡 Market Insights & Lessons</summary>
+              <pre id="knowledgeInsights" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading insights...</pre>
+            </details>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        // Performance
+        const perfRes = await fetch('/api/performance');
+        const perf = await perfRes.json();
+        document.getElementById('statTotal').innerText = perf.total_trades || 0;
+        document.getElementById('statWinRate').innerText = (perf.win_rate || 0) + '%';
+        document.getElementById('statPnlUsd').innerText = '$' + (perf.net_pnl_usd || 0).toFixed(2);
+        document.getElementById('statPnlR').innerText = (perf.net_pnl_r >= 0 ? '+' : '') + (perf.net_pnl_r || 0).toFixed(1) + 'R';
+
+        // Decisions
+        const decRes = await fetch('/api/decisions');
+        const decisions = await decRes.json();
+        if (decisions.length > 0) {
+          const rows = decisions.slice(0, 15).map(d => {
+            const badgeClass = d.action === 'BUY' ? 'text-emerald-400 font-bold' : (d.action === 'SELL' ? 'text-rose-400 font-bold' : 'text-slate-400');
+            return `<tr>
+              <td class="p-2.5 text-slate-400">${d.bar_time}</td>
+              <td class="p-2.5 ${badgeClass}">${d.action}</td>
+              <td class="p-2.5 text-slate-300">${d.regime}</td>
+              <td class="p-2.5 text-amber-300">${(d.confidence * 100).toFixed(0)}%</td>
+              <td class="p-2.5 text-slate-400 truncate max-w-xs" title="${d.reason}">${d.reason}</td>
+            </tr>`;
+          }).join('');
+          document.getElementById('decisionsTable').innerHTML = rows;
+        }
+
+        // Trades
+        const tradeRes = await fetch('/api/trades');
+        const trades = await tradeRes.json();
+        if (trades.length > 0) {
+          const rows = trades.slice(0, 10).map(t => {
+            const pnlColor = (t.pnl_usd || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400';
+            return `<tr>
+              <td class="p-2.5">${t.ticket}</td>
+              <td class="p-2.5">${t.direction}</td>
+              <td class="p-2.5">${(t.entry_price || 0).toFixed(2)}</td>
+              <td class="p-2.5">${(t.close_price || 0).toFixed(2)}</td>
+              <td class="p-2.5 ${pnlColor}">$${(t.pnl_usd || 0).toFixed(2)}</td>
+              <td class="p-2.5 ${pnlColor}">${(t.pnl_r || 0).toFixed(2)}R</td>
+            </tr>`;
+          }).join('');
+          document.getElementById('tradesTable').innerHTML = rows;
+        }
+
+        // Knowledge
+        const knowRes = await fetch('/api/knowledge');
+        const know = await knowRes.json();
+        document.getElementById('knowledgeRules').innerText = know.trading_rules || 'No rules found.';
+        document.getElementById('knowledgePrefs').innerText = know.strategy_preferences || 'No preferences found.';
+        document.getElementById('knowledgeInsights').innerText = know.market_insights || 'No insights recorded yet.';
+
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 15000);
+  </script>
+</body>
+</html>

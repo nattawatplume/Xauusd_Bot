@@ -2,6 +2,12 @@
 
 This repository contains an experimental MetaTrader 5 Expert Advisor and a Python historical backtest. It is a research project, not a verified profitable trading system.
 
+## New local AI prototype
+
+The separate [`AI_XAU_V1`](AI_XAU_V1/README.md) directory contains a local-model MT5 bridge prototype. The legacy EA and its backtests remain unchanged. The AI prototype defaults to shadow mode and requires local Ollama plus an explicit MT5 WebRequest allow-list. It has not been compiled in MetaEditor or validated on a demo account; review its setup and limitations before use.
+
+The separate [`cloud_ai_trader`](cloud_ai_trader/README.md) directory is an experimental Gemini-backed service prototype. It is not yet a complete trade ledger or a validated autonomous trader; review its limitations and keep its API private.
+
 ## Current EA behavior
 
 - The default mode is `SCALP_PA` on M5, using closed M15 trend direction, as the simpler comparison baseline. The more permissive `SCALP_ACTIVE` mode remains available for experiments; it is not the default because the latest user-shared run lost money.

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ai-brain:
+    build: .
+    container_name: xau-ai-brain
+    restart: unless-stopped
+    ports:
+      # Keep the bridge private on the VPS. Expose it through a configured TLS proxy if needed.
+      - "127.0.0.1:8765:8765"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./knowledge:/app/knowledge
