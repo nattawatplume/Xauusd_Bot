@@ -5,6 +5,9 @@ This directory contains an experimental FastAPI/Gemini decision service and a sm
 ## Current scope
 
 - MT5 can submit a market snapshot to `POST /v1/decision`; the service returns a structured proposal. The EA remains responsible for checking the response and sending or rejecting an order.
+- The dashboard reads `GET /api/market`. The updated `AI_XAU_V1/MQL5/Experts/XAU_AI_Trader.mq5` sends up to 60 closed MT5 candles, the broker quote/account currency, and the EA's broker-confirmed positions. Entry/SL/TP changes are synced after MT5 trade transactions. The page draws only those supplied values; its quote refreshes on an EA snapshot, not on every tick.
+- When AI trading filters block a new decision (or Shadow mode already has a position), the EA can send a market-only update to `POST /v1/market` without asking Gemini for another decision.
+- Latest market data are held in service memory and are cleared when the service restarts. The next MT5 sync restores them. Older EA builds may provide only eight chart bars and may not expose exact position levels.
 - MT5 can submit a close notification to `POST /v1/trade_closed`; the service records a reflection. The current EA notification does not include the opening event or initial cash risk, so this prototype cannot yet produce a complete trade ledger or trustworthy R-multiples from that notification alone.
 - The dashboard and JSON endpoints display service memory. They are not an authenticated operator console; keep the service private.
 - Daily review runs inside the Python process. It is not an independent scheduler and does not run while the service is stopped.
@@ -31,6 +34,8 @@ python main.py
 ```
 
 By default, the API binds to `127.0.0.1:8765`. Open `http://127.0.0.1:8765/dashboard` on that same machine. In MT5, allow the bridge URL under **Tools → Options → Expert Advisors** and set the EA URL/token inputs to match. Shadow mode and EA trading-disabled defaults should remain in place during observation.
+
+For the dashboard's live-data panel, compile and attach the updated `AI_XAU_V1/MQL5/Experts/XAU_AI_Trader.mq5` in MetaEditor. `AI_XAU_V1/service` is a separate Ollama bridge and also defaults to port `8765`; do not start both services on that same port. The Cloud dashboard reads data from the FastAPI process in this directory.
 
 ## VPS
 

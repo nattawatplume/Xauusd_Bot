@@ -473,6 +473,56 @@ string JsonEscape(string value)
    return out;
 }
 
+string BoolJson(bool value)
+{
+   return value ? "true" : "false";
+}
+
+string OpenPositionsJson()
+{
+   string json = "[";
+   bool first = true;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      string symbol = PositionGetSymbol(i); // Selects this position for PositionGet* calls.
+      if(symbol != _Symbol || PositionGetInteger(POSITION_MAGIC) != MagicNumber) continue;
+      if(!first) json += ",";
+      first = false;
+      ulong ticket = (ulong)PositionGetInteger(POSITION_TICKET);
+      string direction = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY ? "BUY" : "SELL";
+      json += StringFormat(
+         "{\"ticket\":%I64u,\"symbol\":\"%s\",\"direction\":\"%s\",\"volume\":%.8f,"
+         "\"entry_price\":%.5f,\"sl_price\":%.5f,\"tp_price\":%.5f,\"profit\":%.2f,\"open_time\":\"%s\"}",
+         ticket, JsonEscape(symbol), direction, PositionGetDouble(POSITION_VOLUME),
+         PositionGetDouble(POSITION_PRICE_OPEN), PositionGetDouble(POSITION_SL),
+         PositionGetDouble(POSITION_TP), PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP),
+         TimeToString((datetime)PositionGetInteger(POSITION_TIME), TIME_DATE|TIME_SECONDS));
+   }
+   return json + "]";
+}
+
+void SendPositionSnapshot()
+{
+   string positionsUrl = AIBridgeURL;
+   if(StringFind(positionsUrl, "/v1/decision") < 0) return;
+   StringReplace(positionsUrl, "/v1/decision", "/v1/positions");
+
+   string payload = StringFormat("{\"symbol\":\"%s\",\"server_time\":\"%s\",\"account_currency\":\"%s\",\"positions\":%s}",
+                                 JsonEscape(_Symbol),
+                                 TimeToString(TimeTradeServer(), TIME_DATE|TIME_SECONDS),
+                                 JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)),
+                                 OpenPositionsJson());
+   char request[], response[];
+   StringToCharArray(payload, request, 0, WHOLE_ARRAY, CP_UTF8);
+   if(ArraySize(request) > 0) ArrayResize(request, ArraySize(request) - 1);
+   string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
+   string responseHeaders;
+   ResetLastError();
+   int status = WebRequest("POST", positionsUrl, headers, 2000, request, response, responseHeaders);
+   if(status != 200 && status != 404)
+      PrintFormat("Dashboard position sync failed: status=%d error=%d", status, GetLastError());
+}
+
 string HighImpactCalendarJson()
 {
    string json = "[";
@@ -525,6 +575,8 @@ string BuildAIPayload()
 {
    MqlTick tick;
    if(!SymbolInfoTick(_Symbol, tick)) return "";
+   string timeframe = EnumToString(TF);
+   StringReplace(timeframe, "PERIOD_", "");
    datetime barTime = iTime(_Symbol, TF, 1);
    double atrM5 = Buf(hATR, 1), rsi = Buf(hRSI, 1);
    double ema9 = Buf(hCrossFast, 1), ema21 = Buf(hCrossSlow, 1);
@@ -549,6 +601,24 @@ string BuildAIPayload()
    }
    candles += "]";
 
+   // More real, closed MT5 bars for the dashboard chart. The AI continues to use
+   // the compact eight-bar candles_m5 array above.
+   string chartCandles = "[";
+   bool firstChartCandle = true;
+   for(int shift = 1; shift <= 60; shift++)
+   {
+      datetime candleTime = iTime(_Symbol, TF, shift);
+      if(candleTime <= 0) break;
+      if(!firstChartCandle) chartCandles += ",";
+      firstChartCandle = false;
+      chartCandles += StringFormat("{\"t\":%I64d,\"label\":\"%s\",\"o\":%.5f,\"h\":%.5f,\"l\":%.5f,\"c\":%.5f,\"tv\":%I64d}",
+                                   (long)candleTime, TimeToString(candleTime, TIME_DATE|TIME_MINUTES),
+                                   iOpen(_Symbol, TF, shift), iHigh(_Symbol, TF, shift),
+                                   iLow(_Symbol, TF, shift), iClose(_Symbol, TF, shift), iTickVolume(_Symbol, TF, shift));
+   }
+   chartCandles += "]";
+   string openPositions = OpenPositionsJson();
+
    string pos = "none";
    double posProfit = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
@@ -559,19 +629,46 @@ string BuildAIPayload()
       break;
    }
 
-   return StringFormat("{\"symbol\":\"%s\",\"timeframe\":\"M5\",\"bar_time\":\"%s\","
-      "\"server_time\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"spread_points\":%d,"
+   return StringFormat("{\"symbol\":\"%s\",\"timeframe\":\"%s\",\"bar_time\":\"%s\","
+      "\"server_time\":\"%s\",\"account_currency\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"spread_points\":%d,"
+      "\"ai_enabled\":%s,\"ai_shadow\":%s,\"legacy_signal_fallback\":%s,"
+      "\"terminal_connected\":%s,\"terminal_trade_allowed\":%s,\"ea_trade_allowed\":%s,"
       "\"equity\":%.2f,\"balance\":%.2f,\"position\":\"%s\",\"position_pnl\":%.2f,"
       "\"atr_m5\":%.5f,\"rsi_m5\":%.2f,\"ema9_m5\":%.5f,\"ema21_m5\":%.5f,"
       "\"ema20_m15\":%.5f,\"ema50_m15\":%.5f,\"adx_m15\":%.2f,\"atr_m15\":%.5f,"
-      "\"high_impact_usd_events\":%s,\"candles_m5\":%s,"
+      "\"high_impact_usd_events\":%s,\"candles_m5\":%s,\"chart_candles_m5\":%s,\"open_positions\":%s,"
       "\"constraints\":{\"confidence_min\":%.2f,\"stop_atr_min\":%.2f,\"stop_atr_max\":%.2f,"
       "\"target_r_min\":%.2f,\"target_r_max\":%.2f}}",
-      _Symbol, TimeToString(barTime, TIME_DATE|TIME_MINUTES), TimeToString(TimeTradeServer(), TIME_DATE|TIME_MINUTES),
+      JsonEscape(_Symbol), JsonEscape(timeframe), TimeToString(barTime, TIME_DATE|TIME_MINUTES), TimeToString(TimeTradeServer(), TIME_DATE|TIME_MINUTES),
+      JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)),
       tick.bid, tick.ask, (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD),
+      BoolJson(AIEnableTrading), BoolJson(AIShadowMode), BoolJson(EnableLegacySignalFallback),
+      BoolJson(TerminalInfoInteger(TERMINAL_CONNECTED) == 1),
+      BoolJson(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) == 1),
+      BoolJson(MQLInfoInteger(MQL_TRADE_ALLOWED) == 1),
       AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_BALANCE), pos, posProfit,
       atrM5, rsi, ema9, ema21, ema20, ema50, adx, atrM15,
-      HighImpactCalendarJson(), candles, AIConfidenceMin, AIMinStopATR, AIMaxStopATR, AIMinTargetR, AIMaxTargetR);
+      HighImpactCalendarJson(), candles, chartCandles, openPositions,
+      AIConfidenceMin, AIMinStopATR, AIMaxStopATR, AIMinTargetR, AIMaxTargetR);
+}
+
+void SendDashboardMarketSnapshot()
+{
+   string marketUrl = AIBridgeURL;
+   if(StringFind(marketUrl, "/v1/decision") < 0) return;
+   StringReplace(marketUrl, "/v1/decision", "/v1/market");
+   string payload = BuildAIPayload();
+   if(payload == "") return;
+
+   char request[], response[];
+   StringToCharArray(payload, request, 0, WHOLE_ARRAY, CP_UTF8);
+   if(ArraySize(request) > 0) ArrayResize(request, ArraySize(request) - 1);
+   string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
+   string responseHeaders;
+   ResetLastError();
+   int status = WebRequest("POST", marketUrl, headers, 5000, request, response, responseHeaders);
+   if(status != 200 && status != 404)
+      PrintFormat("Dashboard market sync failed: status=%d error=%d", status, GetLastError());
 }
 
 string JsonReadString(string json, string key)
@@ -1258,6 +1355,7 @@ void OnTick()
       if(HasPosition())
       {
          if(AIEnableTrading) GetAISignal();
+         else SendDashboardMarketSnapshot();
          if(AIEnableTrading && aiExitDecision)
          {
             for(int i = PositionsTotal() - 1; i >= 0; i--)
@@ -1271,16 +1369,16 @@ void OnTick()
          }
          return;
       }
-      if(!FiltersOK()) return;
+      if(!FiltersOK()) { SendDashboardMarketSnapshot(); return; }
       signalStructSL = 0;
       signalStructTP = 0;
       int aiSig = GetAISignal();
       if(aiSig != 0 && AIEnableTrading) OpenTrade(aiSig);
       return;
    }
-   if(!EnableLegacySignalFallback) return;
-   if(HasPosition()) return;          // เปิดทีละ 1 ไม้
-   if(!FiltersOK())  return;
+   if(!EnableLegacySignalFallback) { SendDashboardMarketSnapshot(); return; }
+   if(HasPosition()) { SendDashboardMarketSnapshot(); return; } // เปิดทีละ 1 ไม้
+   if(!FiltersOK())  { SendDashboardMarketSnapshot(); return; }
 
    signalStructSL = 0;
    signalStructTP = 0;
@@ -1303,29 +1401,50 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
          long magic = HistoryDealGetInteger(dealTicket, DEAL_MAGIC);
          long entry = HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
          string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
-         if(magic == MagicNumber && entry == DEAL_ENTRY_OUT && symbol == _Symbol)
+         if(magic == MagicNumber && symbol == _Symbol)
          {
-            double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
-            double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
-            datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+            // Update the dashboard from the terminal before any slower reflection call.
+            SendPositionSnapshot();
+            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
+            {
+               double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+               double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+               datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
 
-            string payload = StringFormat(
-               "{\"ticket\":%I64u,\"symbol\":\"%s\",\"close_price\":%.2f,\"pnl_usd\":%.2f,\"close_time\":\"%s\"}",
-               dealTicket, symbol, closePrice, profit, TimeToString(closeTime, TIME_DATE|TIME_SECONDS)
-            );
+               string payload = StringFormat(
+                  "{\"ticket\":%I64u,\"symbol\":\"%s\",\"close_price\":%.2f,\"pnl_usd\":%.2f,\"close_time\":\"%s\"}",
+                  dealTicket, symbol, closePrice, profit, TimeToString(closeTime, TIME_DATE|TIME_SECONDS)
+               );
 
-            char req[], resp[];
-            StringToCharArray(payload, req, 0, WHOLE_ARRAY, CP_UTF8);
-            if(ArraySize(req) > 0) ArrayResize(req, ArraySize(req) - 1);
-            string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
-            string respHeaders;
+               char req[], resp[];
+               StringToCharArray(payload, req, 0, WHOLE_ARRAY, CP_UTF8);
+               if(ArraySize(req) > 0) ArrayResize(req, ArraySize(req) - 1);
+               string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
+               string respHeaders;
 
-            string closeUrl = AIBridgeURL;
-            StringReplace(closeUrl, "/v1/decision", "/v1/trade_closed");
+               string closeUrl = AIBridgeURL;
+               StringReplace(closeUrl, "/v1/decision", "/v1/trade_closed");
 
-            ResetLastError();
-            int status = WebRequest("POST", closeUrl, headers, 5000, req, resp, respHeaders);
-            PrintFormat("Cloud AI Trade Reflection sent: ticket=%I64u status=%d profit=%.2f", dealTicket, status, profit);
+               ResetLastError();
+               int status = WebRequest("POST", closeUrl, headers, 5000, req, resp, respHeaders);
+               PrintFormat("Cloud AI Trade Reflection sent: ticket=%I64u status=%d profit=%.2f", dealTicket, status, profit);
+            }
+
+         }
+      }
+      return;
+   }
+
+   // Stop/target edits (including break-even moves) are confirmed as position
+   // transactions. Refresh only when this EA still owns a position on the symbol.
+   if(trans.type == TRADE_TRANSACTION_POSITION && trans.symbol == _Symbol)
+   {
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+      {
+         if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         {
+            SendPositionSnapshot();
+            break;
          }
       }
    }

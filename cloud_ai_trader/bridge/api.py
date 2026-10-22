@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hmac
 import logging
+import math
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -25,6 +27,107 @@ templates_dir = settings.BASE_DIR / "dashboard" / "templates"
 templates = Jinja2Templates(directory=str(templates_dir)) if templates_dir.exists() else None
 
 brain: AIBrain | None = None
+latest_market_state: dict[str, Any] | None = None
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _bool_or_none(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _positions_from_payload(raw_positions: Any, expected_symbol: str | None = None) -> list[dict[str, Any]]:
+    """Keep only complete, numeric position facts reported by the MT5 EA."""
+    if not isinstance(raw_positions, list) or len(raw_positions) > 20:
+        raise HTTPException(status_code=400, detail="positions must be a list with at most 20 items")
+
+    positions: list[dict[str, Any]] = []
+    for item in raw_positions:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail="invalid position item")
+        direction = str(item.get("direction", "")).upper()
+        numeric_fields = ("ticket", "volume", "entry_price", "sl_price", "tp_price", "profit")
+        if direction not in {"BUY", "SELL"} or any(not _finite_number(item.get(key)) for key in numeric_fields):
+            raise HTTPException(status_code=400, detail="position is missing valid broker values")
+        item_symbol = str(item.get("symbol", ""))[:32]
+        if (expected_symbol and item_symbol != expected_symbol) or not float(item["ticket"]).is_integer() or int(item["ticket"]) <= 0 or float(item["volume"]) <= 0:
+            raise HTTPException(status_code=400, detail="position symbol, ticket, or volume is invalid")
+        if float(item["entry_price"]) <= 0 or float(item["sl_price"]) < 0 or float(item["tp_price"]) < 0:
+            raise HTTPException(status_code=400, detail="position prices are invalid")
+        positions.append({
+            "ticket": int(item["ticket"]),
+            "symbol": item_symbol,
+            "direction": direction,
+            "volume": float(item["volume"]),
+            "entry_price": float(item["entry_price"]),
+            "sl_price": float(item["sl_price"]),
+            "tp_price": float(item["tp_price"]),
+            "profit": float(item["profit"]),
+            "open_time": str(item.get("open_time", ""))[:40],
+        })
+    return positions
+
+
+def _record_market_snapshot(snapshot: dict[str, Any]) -> None:
+    """Retain only the latest source data needed by the read-only dashboard."""
+    global latest_market_state
+    raw_candles = snapshot.get("chart_candles_m5")
+    chart_source = "chart_candles_m5"
+    if not isinstance(raw_candles, list):
+        raw_candles = snapshot.get("candles_m5")
+        chart_source = "candles_m5"
+
+    candles: list[dict[str, Any]] = []
+    if isinstance(raw_candles, list):
+        for candle in raw_candles[:120]:
+            if not isinstance(candle, dict) or any(not _finite_number(candle.get(key)) for key in ("o", "h", "l", "c")):
+                continue
+            item = {key: float(candle[key]) for key in ("o", "h", "l", "c")}
+            if isinstance(candle.get("label"), str):
+                item["label"] = candle["label"][:32]
+            if _finite_number(candle.get("t")):
+                item["t"] = int(candle["t"])
+            if _finite_number(candle.get("tv")):
+                item["tv"] = int(candle["tv"])
+            candles.append(item)
+
+    positions_available = isinstance(snapshot.get("open_positions"), list)
+    positions = _positions_from_payload(snapshot["open_positions"], str(snapshot.get("symbol", ""))) if positions_available else None
+    state = {
+        "available": True,
+        "market_received_at": datetime.now(timezone.utc).isoformat(),
+        "positions_received_at": datetime.now(timezone.utc).isoformat() if positions_available else None,
+        "symbol": str(snapshot.get("symbol", ""))[:32],
+        "timeframe": str(snapshot.get("timeframe", ""))[:12],
+        "server_time": str(snapshot.get("server_time", ""))[:40],
+        "account_currency": str(snapshot.get("account_currency", ""))[:12],
+        "bar_time": str(snapshot.get("bar_time", ""))[:40],
+        "bid": snapshot.get("bid") if _finite_number(snapshot.get("bid")) else None,
+        "ask": snapshot.get("ask") if _finite_number(snapshot.get("ask")) else None,
+        "spread_points": snapshot.get("spread_points") if _finite_number(snapshot.get("spread_points")) else None,
+        "balance": snapshot.get("balance") if _finite_number(snapshot.get("balance")) else None,
+        "equity": snapshot.get("equity") if _finite_number(snapshot.get("equity")) else None,
+        "position": str(snapshot.get("position", ""))[:12],
+        "position_pnl": snapshot.get("position_pnl") if _finite_number(snapshot.get("position_pnl")) else None,
+        "ai_enabled": _bool_or_none(snapshot.get("ai_enabled")),
+        "ai_shadow": _bool_or_none(snapshot.get("ai_shadow")),
+        "legacy_signal_fallback": _bool_or_none(snapshot.get("legacy_signal_fallback")),
+        "terminal_connected": _bool_or_none(snapshot.get("terminal_connected")),
+        "terminal_trade_allowed": _bool_or_none(snapshot.get("terminal_trade_allowed")),
+        "ea_trade_allowed": _bool_or_none(snapshot.get("ea_trade_allowed")),
+        "candles": candles,
+        "chart_source": chart_source,
+        "positions_available": positions_available,
+        "open_positions": positions,
+    }
+    # Preserve an immediate transaction update if an older EA omits the new field.
+    if not positions_available and latest_market_state and latest_market_state.get("symbol") == state["symbol"]:
+        state["positions_available"] = latest_market_state.get("positions_available", False)
+        state["positions_received_at"] = latest_market_state.get("positions_received_at")
+        state["open_positions"] = latest_market_state.get("open_positions")
+    latest_market_state = state
 
 
 @app.on_event("startup")
@@ -60,7 +163,16 @@ async def get_decision(
         raise HTTPException(status_code=503, detail="Brain not initialized")
 
     try:
-        decision = await brain.process_bar(snapshot)
+        if str(snapshot.get("symbol", "")).upper().startswith("XAUUSD"):
+            _record_market_snapshot(snapshot)
+        # Chart and exact position details are for the dashboard only; the analysis
+        # pipeline retains its existing compact decision payload.
+        dashboard_only = {
+            "chart_candles_m5", "open_positions", "account_currency", "ai_enabled", "ai_shadow",
+            "legacy_signal_fallback", "terminal_connected", "terminal_trade_allowed", "ea_trade_allowed",
+        }
+        decision_snapshot = {key: value for key, value in snapshot.items() if key not in dashboard_only}
+        decision = await brain.process_bar(decision_snapshot)
         return decision
     except Exception as exc:
         log.exception("Error processing bar decision: %s", exc)
@@ -73,6 +185,18 @@ async def get_decision(
             "target_r": settings.MIN_TARGET_R,
             "reason": f"Fail-closed: Error in bridge ({type(exc).__name__})",
         }
+
+
+@app.post("/v1/market")
+async def update_market(
+    snapshot: dict[str, Any],
+    token: str = Depends(verify_token),
+) -> dict[str, Any]:
+    """Receive an MT5 chart snapshot without invoking the AI or changing trading."""
+    if not str(snapshot.get("symbol", "")).upper().startswith("XAUUSD"):
+        raise HTTPException(status_code=400, detail="unsupported symbol")
+    _record_market_snapshot(snapshot)
+    return {"status": "ok", "received_at": latest_market_state["market_received_at"] if latest_market_state else None}
 
 
 @app.post("/v1/trade_closed")
@@ -90,6 +214,49 @@ async def trade_closed(
     except Exception as exc:
         log.exception("Error processing trade reflection: %s", exc)
         return {"status": "error", "detail": str(exc)}
+
+
+@app.post("/v1/positions")
+async def sync_positions(
+    update: dict[str, Any],
+    token: str = Depends(verify_token),
+) -> dict[str, Any]:
+    """Receive broker-confirmed EA positions after an MT5 trade transaction."""
+    global latest_market_state
+    symbol = str(update.get("symbol", ""))
+    if not symbol.upper().startswith("XAUUSD"):
+        raise HTTPException(status_code=400, detail="unsupported symbol")
+    positions = _positions_from_payload(update.get("positions"), symbol)
+    received_at = datetime.now(timezone.utc).isoformat()
+    server_time = str(update.get("server_time", ""))[:40]
+
+    if latest_market_state is None or latest_market_state.get("symbol") != symbol:
+        latest_market_state = {
+            "available": False,
+            "market_received_at": None,
+            "symbol": symbol[:32],
+            "timeframe": "M5",
+            "server_time": server_time,
+            "account_currency": str(update.get("account_currency", ""))[:12],
+            "bar_time": "",
+            "bid": None,
+            "ask": None,
+            "spread_points": None,
+            "balance": None,
+            "equity": None,
+            "position": "",
+            "position_pnl": None,
+            "candles": [],
+            "chart_source": "none",
+        }
+    latest_market_state["positions_available"] = True
+    latest_market_state["open_positions"] = positions
+    latest_market_state["positions_received_at"] = received_at
+    if server_time:
+        latest_market_state["positions_server_time"] = server_time
+    if update.get("account_currency"):
+        latest_market_state["account_currency"] = str(update["account_currency"])[:12]
+    return {"status": "ok", "positions": len(positions), "received_at": received_at}
 
 
 # -----------------------------------------------------------------------------
@@ -126,6 +293,14 @@ async def api_performance() -> dict[str, Any]:
     if brain is None:
         return {}
     return await brain.memory.get_performance_summary()
+
+
+@app.get("/api/market")
+async def api_market() -> dict[str, Any]:
+    """Latest market and position facts received from the configured MT5 EA."""
+    if latest_market_state is None:
+        return {"available": False, "market_received_at": None, "positions_available": False, "open_positions": None, "candles": []}
+    return dict(latest_market_state)
 
 
 @app.get("/api/knowledge")

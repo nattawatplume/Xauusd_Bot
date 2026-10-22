@@ -5,6 +5,7 @@ This folder is a separate prototype. The existing root-level `XAU_Pro_EA.mq5` an
 ## What the AI receives and decides
 
 - Eight closed M5 candles, M5 RSI/EMA/ATR, M15 EMA/ADX/ATR, bid/ask/spread, account equity/balance, EA position state, and upcoming high-impact USD events from the MT5 economic calendar.
+- The updated EA also sends up to 60 closed M5 candles, broker-confirmed EA positions, account currency, and terminal permissions for the Cloud dashboard. Those dashboard-only fields are excluded from the Ollama model prompt. The local Ollama service is separate from `cloud_ai_trader` and does not host its dashboard.
 - Recent headline metadata from the public GDELT DOC search endpoint. This is a convenience feed without a trading-service uptime guarantee; the headline list can be empty or stale.
 - A structured decision: `BUY`, `SELL`, `NO_TRADE`, or `EXIT`; setup (`pullback`, `breakout`, `range_reversal`); market regime; confidence; stop distance in ATR; target in R; and a short reason.
 - `EXIT` is only accepted for this EA's position. The EA rejects stale bar responses, low confidence, invalid actions, and stop/target values outside configured bounds.
