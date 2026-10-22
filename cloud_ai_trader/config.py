@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     MAX_SPREAD_POINTS: float = 40.0   # Reject entries above this broker-point spread
 
     # AI Decision Bounds (AI can adjust within these)
-    MIN_CONFIDENCE: float = 0.65      # Minimum confidence to trade
+    MIN_CONFIDENCE: float = 0.50      # Balanced confidence floor for realistic trade capture
     MIN_STOP_ATR: float = 0.5         # Minimum SL in ATR units
     MAX_STOP_ATR: float = 3.0         # Maximum SL in ATR units
     MIN_TARGET_R: float = 1.0         # Minimum R:R
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     ENABLE_TRADING: bool = False      # Status flag only; this service never sends broker orders
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(Path(__file__).resolve().parent / ".env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

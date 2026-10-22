@@ -1,26 +1,21 @@
 # Strategy Preferences (AI-Managed)
 
-> Last updated: Initial version
-> The AI adjusts these preferences based on which strategies work in which conditions.
+> Last updated: Tuned for realistic intraday gold execution (M5 timeframe)
+> The AI dynamically selects setups based on market regime and price structure.
 
 ## Regime → Strategy Matrix
 
-| Market Regime | Preferred Strategy | Confidence Required | Notes |
+| Market Regime | Preferred Strategy | Confidence Required | Entry Criteria |
 |---|---|---|---|
-| Strong Trend (ADX>25, EMA aligned) | Pullback | 0.65 | Wait for RSI to dip below 40 (buy) or above 60 (sell) |
-| Weak Trend (ADX 20-25) | Pullback or Breakout | 0.70 | Need extra confirmation |
-| Ranging (ADX<20) | NO_TRADE preferred | 0.80 | Only range_reversal at extreme levels |
-| Breakout (price beyond Donchian 20) | Breakout | 0.70 | ADX must confirm momentum |
-| High Volatility (ATR>2x avg) | NO_TRADE | N/A | Too risky for $100 account |
-| Pre-News (within 15 min) | NO_TRADE | N/A | Always avoid |
+| Strong Trend (ADX > 25) | Trend Pullback or Confirmed Continuation | 0.50 | Consider a closed-bar rejection/engulfing at the M5 EMA9/21 zone, or a strong close beyond the recent six-bar range in the M15 trend direction. |
+| Moderate Trend (ADX 16 - 25) | Confirmed Pullback or Breakout | 0.50 | Require M15 EMA20/50 alignment and a closed M5 rejection/engulfing near EMA9/21, or a strong close beyond the previous six-bar range. |
+| Breakout (Price breaks Donchian 15-20) | Momentum Breakout | 0.50 | Close beyond recent swing high/low with expanding candle size. |
+| Ranging / Flat (ADX < 18) | Range Reversal / Stand Aside | 0.65 | Reversal only at extreme Support/Resistance with pinbar/rejection. |
+| High Volatility / News Spike | Stand Aside | N/A | Wait for spread to normalize (<35 pts) before entering. |
 
-## Current Parameter Preferences
-- SL: 1.5x ATR (range: 0.5 - 3.0)
-- Target: 1.5R (range: 1.0 - 4.0)
-- Confidence threshold: 0.65 (range: 0.5 - 0.95)
-- Preferred trading hours: 08:00 - 20:00 server time
-
-## Strategy Performance Tracking
-- Pullback: No data yet (new system)
-- Breakout: No data yet
-- Range Reversal: No data yet
+## Parameter Preferences
+- Stop Loss: 1.2x - 1.5x ATR (Structural stop)
+- Take Profit: 1.5R - 2.0R
+- Confidence Threshold: 0.50 (balanced: sensitive to good setups, but filters random noise)
+- Confidence is the model's self-rating, not a measured win probability; it cannot replace evidence or a cost-aware risk/reward check.
+- Active Trading Hours: 07:00 - 22:00 server time

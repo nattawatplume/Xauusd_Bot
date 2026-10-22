@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from config import settings
@@ -139,8 +139,15 @@ async def api_knowledge() -> dict[str, Any]:
     }
 
 
+@app.get("/")
+async def root_view() -> RedirectResponse:
+    """Redirect root path to /dashboard."""
+    return RedirectResponse(url="/dashboard")
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_view(request: Request) -> Any:
-    if templates is None:
-        return HTMLResponse("<h3>Dashboard templates not found</h3>")
-    return templates.TemplateResponse("index.html", {"request": request})
+async def dashboard_view() -> HTMLResponse:
+    html_file = settings.BASE_DIR / "dashboard" / "templates" / "index.html"
+    if not html_file.exists():
+        return HTMLResponse("<h3>Dashboard template not found</h3>", status_code=404)
+    return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
