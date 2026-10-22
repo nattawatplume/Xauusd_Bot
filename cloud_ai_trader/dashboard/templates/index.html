@@ -1,199 +1,479 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🧠 XAU Cloud AI Trader Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172321">
+  <meta name="description" content="หน้าติดตามสถานะและผลการทำงานของ XAUUSD trading bridge">
+  <title>Gold Desk — XAUUSD</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b29;
+      --muted: #74817d;
+      --line: #e5eae6;
+      --paper: #f5f7f4;
+      --surface: #fff;
+      --pine: #19332d;
+      --pine-2: #284a41;
+      --mint: #e8f3ee;
+      --green: #27704e;
+      --green-soft: #e9f5ee;
+      --red: #b44e4e;
+      --red-soft: #faeeee;
+      --amber: #94691e;
+      --amber-soft: #f8f1df;
+      --shadow: 0 2px 8px rgba(30, 48, 42, .035), 0 14px 36px rgba(30, 48, 42, .035);
+      font-family: Inter, "Segoe UI", Tahoma, "Noto Sans Thai", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font-size: 14px; }
+    button, a { font: inherit; }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 5; width: 232px; padding: 25px 17px;
+      display: flex; flex-direction: column; color: #eaf0ec; background: var(--pine);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 1px 9px 28px; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: #f2d99d; background: #315147; font-weight: 750; letter-spacing: -.08em; }
+    .brand-name { font-weight: 700; font-size: 15px; letter-spacing: .01em; }
+    .brand-caption { color: #a7b9b0; margin-top: 2px; font-size: 11px; }
+    .nav-label { padding: 10px 10px 8px; color: #91a79c; text-transform: uppercase; letter-spacing: .1em; font-size: 10px; }
+    .nav { display: grid; gap: 5px; }
+    .nav a { display: flex; gap: 11px; align-items: center; min-height: 41px; padding: 0 11px; color: #bdccc4; border-radius: 8px; transition: background .16s, color .16s; }
+    .nav a:hover, .nav a.active { color: #fff; background: #2b493f; }
+    .nav svg { width: 17px; height: 17px; opacity: .9; }
+    .side-bottom { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid rgba(222, 239, 229, .14); color: #a9bcb2; font-size: 11px; line-height: 1.65; }
+    .side-bottom strong { display: block; color: #e9f0eb; font-weight: 600; }
+    main { min-height: 100vh; margin-left: 232px; }
+    .topbar { position: sticky; top: 0; z-index: 4; height: 65px; display: flex; align-items: center; justify-content: space-between; padding: 0 34px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.91); backdrop-filter: blur(12px); }
+    .crumb { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
+    .crumb strong { color: var(--ink); font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 14px; }
+    .updated { color: var(--muted); font-size: 11px; }
+    .refresh { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 35px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: white; transition: border-color .15s, background .15s; }
+    .refresh:hover { border-color: #b9c9c0; background: #f8fbf9; }
+    .refresh svg { width: 15px; height: 15px; }
+    .content { width: min(1280px, 100%); margin: 0 auto; padding: 30px 34px 54px; }
+    .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+    .eyebrow { margin: 0 0 7px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(24px, 2.4vw, 31px); line-height: 1.2; letter-spacing: -.035em; font-weight: 680; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .symbol-chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: white; font-weight: 650; font-size: 12px; white-space: nowrap; }
+    .gold-dot { width: 8px; height: 8px; border-radius: 50%; background: #c59b49; box-shadow: 0 0 0 3px #f8f0dc; }
+    .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; margin-bottom: 23px; }
+    .status-card { display: flex; align-items: center; min-height: 76px; gap: 12px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
+    .status-icon { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: var(--green); background: var(--green-soft); }
+    .status-icon svg { width: 17px; height: 17px; }
+    .status-icon.pending { color: var(--amber); background: var(--amber-soft); }
+    .status-icon.offline { color: var(--red); background: var(--red-soft); }
+    .status-copy { min-width: 0; flex: 1; }
+    .status-title { color: var(--muted); font-size: 11px; }
+    .status-value { overflow: hidden; margin-top: 4px; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .status-sub { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .state-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 20px; color: var(--green); background: var(--green-soft); font-size: 10px; font-weight: 650; white-space: nowrap; }
+    .state-pill::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+    .state-pill.warn { color: var(--amber); background: var(--amber-soft); }
+    .state-pill.down { color: var(--red); background: var(--red-soft); }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 24px; }
+    .metric { min-height: 112px; padding: 17px 18px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
+    .metric-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; }
+    .metric-top svg { width: 16px; height: 16px; color: #82918a; }
+    .metric-value { margin-top: 15px; font-size: 25px; line-height: 1; font-weight: 680; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+    .metric-note { margin-top: 8px; color: var(--muted); font-size: 10px; }
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr); gap: 18px; align-items: start; }
+    .column { display: grid; gap: 18px; min-width: 0; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); scroll-margin-top: 82px; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 19px 15px; border-bottom: 1px solid #edf0ed; }
+    .panel-title { margin: 0; font-size: 14px; font-weight: 680; letter-spacing: -.01em; }
+    .panel-description { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .panel-count { padding: 4px 8px; color: var(--muted); border-radius: 20px; background: #f2f5f2; font-size: 10px; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
+    th { padding: 10px 13px; color: #7a8781; background: #fafbf9; font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
+    td { max-width: 280px; padding: 12px 13px; border-top: 1px solid #edf0ed; vertical-align: middle; }
+    tbody tr:hover { background: #fbfcfa; }
+    .numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .muted { color: var(--muted); }
+    .reason { max-width: 310px; overflow: hidden; color: #68756f; text-overflow: ellipsis; white-space: nowrap; }
+    .action-pill { display: inline-flex; min-width: 56px; justify-content: center; padding: 5px 7px; border-radius: 5px; font-size: 9px; font-weight: 720; letter-spacing: .03em; }
+    .action-buy { color: var(--green); background: var(--green-soft); }
+    .action-sell { color: var(--red); background: var(--red-soft); }
+    .action-no_trade, .action-exit { color: #69756f; background: #f0f2f0; }
+    .confidence { color: var(--amber); font-weight: 650; font-variant-numeric: tabular-nums; }
+    .empty { padding: 28px 18px; color: var(--muted); text-align: center; font-size: 12px; line-height: 1.7; }
+    .empty strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 12px; }
+    .notice { margin: 0 17px 16px; padding: 10px 12px; border: 1px solid #efe7d4; border-radius: 8px; color: #776644; background: #fcf9f0; font-size: 10px; line-height: 1.6; }
+    .knowledge-list { padding: 7px 17px 16px; }
+    details { border-bottom: 1px solid #edf0ed; }
+    details:last-child { border-bottom: 0; }
+    summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 43px; cursor: pointer; list-style: none; font-size: 11px; font-weight: 620; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { color: #8b9791; content: "+"; font-size: 17px; font-weight: 400; }
+    details[open] summary::after { content: "−"; }
+    .knowledge-text { max-height: 230px; overflow: auto; margin: 0 0 14px; color: #66736d; font: 10px/1.7 "Cascadia Code", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .about-list { display: grid; gap: 0; padding: 4px 18px 13px; }
+    .about-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; border-bottom: 1px solid #edf0ed; font-size: 10px; }
+    .about-row:last-child { border-bottom: 0; }
+    .about-row span:first-child { color: var(--muted); }
+    .about-row strong { font-weight: 620; text-align: right; }
+    .footer { padding: 22px 2px 0; color: #8a9690; font-size: 10px; line-height: 1.6; }
+    .mobile-nav { display: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 1050px) {
+      .sidebar { width: 205px; }
+      main { margin-left: 205px; }
+      .topbar { padding-inline: 25px; }
+      .content { padding-inline: 25px; }
+      .layout { grid-template-columns: minmax(0, 1.4fr) minmax(255px, .9fr); gap: 14px; }
+      .metrics, .status-grid { gap: 10px; }
+    }
+    @media (max-width: 760px) {
+      .sidebar { display: none; }
+      main { margin-left: 0; padding-bottom: 67px; }
+      .topbar { height: 55px; padding: 0 16px; }
+      .crumb { font-size: 11px; }
+      .updated { display: none; }
+      .refresh { min-height: 33px; padding-inline: 10px; font-size: 11px; }
+      .content { padding: 23px 15px 28px; }
+      .page-heading { align-items: flex-start; margin-bottom: 17px; }
+      .eyebrow { font-size: 9px; }
+      h1 { font-size: 25px; }
+      .subtitle { max-width: 265px; font-size: 11px; line-height: 1.6; }
+      .symbol-chip { padding: 8px 9px; font-size: 10px; }
+      .status-grid { grid-template-columns: 1fr; gap: 8px; margin-bottom: 15px; }
+      .status-card { min-height: 63px; padding: 11px 12px; }
+      .status-icon { width: 31px; height: 31px; }
+      .state-pill { font-size: 9px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 15px; }
+      .metric { min-height: 95px; padding: 13px; }
+      .metric-value { margin-top: 13px; font-size: 21px; }
+      .metric-note { font-size: 9px; }
+      .layout { grid-template-columns: 1fr; gap: 14px; }
+      .column { gap: 14px; }
+      .panel-head { padding: 15px 14px 12px; }
+      .panel-title { font-size: 13px; }
+      .panel-description { font-size: 10px; }
+      .table-wrap { overflow: visible; }
+      .responsive-table, .responsive-table tbody { display: block; width: 100%; }
+      .responsive-table thead { display: none; }
+      .responsive-table tr { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; padding: 12px 14px; border-top: 1px solid #edf0ed; }
+      .responsive-table td { display: block; max-width: none; padding: 0; border: 0; }
+      .responsive-table td::before { display: block; margin-bottom: 3px; color: #8a9690; font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+      .decision-table td:nth-child(1) { grid-column: 1; color: var(--muted); font-size: 9px; }
+      .decision-table td:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+      .decision-table td:nth-child(3) { grid-column: 1; }
+      .decision-table td:nth-child(4) { grid-column: 1; }
+      .decision-table td:nth-child(5) { grid-column: 1 / -1; padding-top: 3px; white-space: normal; }
+      .trade-table tr { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+      .trade-table td:nth-child(1) { grid-column: 1 / -1; color: var(--muted); }
+      .trade-table td:nth-child(2)::before { content: "ด้าน"; }
+      .trade-table td:nth-child(3)::before { content: "ราคาเข้า"; }
+      .trade-table td:nth-child(4)::before { content: "ราคาออก"; }
+      .trade-table td:nth-child(5)::before { content: "กำไร/ขาดทุน"; }
+      .trade-table td:nth-child(6)::before { content: "ผลลัพธ์ R"; }
+      .trade-table td:nth-child(5), .trade-table td:nth-child(6) { grid-column: span 1; }
+      .mobile-nav { position: fixed; inset: auto 0 0; z-index: 8; display: grid; grid-template-columns: repeat(4, 1fr); padding: 7px 7px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
+      .mobile-nav a { display: grid; justify-items: center; gap: 3px; padding: 4px 2px; color: #728079; font-size: 9px; }
+      .mobile-nav svg { width: 18px; height: 18px; }
+      .mobile-nav a:hover, .mobile-nav a.active { color: var(--green); }
+      .footer { padding-top: 16px; }
+    }
+    @media (max-width: 380px) {
+      .content { padding-inline: 11px; }
+      .symbol-chip { gap: 6px; padding-inline: 7px; }
+      .metric { padding: 11px; }
+      .metric-value { font-size: 19px; }
+      .state-pill { padding: 5px 6px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
-  <div class="max-w-7xl mx-auto px-4 py-6">
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="เมนูหลัก">
+      <a class="brand" href="#overview" aria-label="Gold Desk หน้าภาพรวม">
+        <span class="brand-mark">G</span>
+        <span><span class="brand-name">Gold Desk</span><span class="brand-caption" style="display:block">XAUUSD · Trading monitor</span></span>
+      </a>
+      <div class="nav-label">พื้นที่ทำงาน</div>
+      <nav class="nav">
+        <a class="active" href="#overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>ภาพรวม</a>
+        <a href="#decisions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2"/></svg>การตัดสินใจ</a>
+        <a href="#trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5m0 14h17M7 15l4-5 3 2 5-7"/></svg>ประวัติรายการ</a>
+        <a href="#notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>บันทึกระบบ</a>
+      </nav>
+      <div class="side-bottom"><strong>โหมดทดลอง</strong>สถานะบนหน้านี้มาจาก service และข้อมูลที่ MT5 ส่งเข้ามา ไม่ใช่ยอดเงินสดในบัญชีโบรกเกอร์</div>
+    </aside>
 
-    <!-- Header -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-800 gap-4">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent flex items-center gap-2">
-          <span>🧠</span> XAU Cloud AI Trader
-        </h1>
-        <p class="text-sm text-slate-400 mt-1">Autonomous Self-Learning Gold Trading Intelligence</p>
-      </div>
-      <div class="flex items-center gap-3">
-        <span id="shadowBadge" class="px-3 py-1 text-xs rounded-full bg-amber-900/60 text-amber-300 border border-amber-600/40">
-          SHADOW MODE
-        </span>
-        <span id="statusBadge" class="px-3 py-1 text-xs rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-600/40 flex items-center gap-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
-        </span>
-      </div>
-    </header>
+    <main id="overview">
+      <header class="topbar">
+        <div class="crumb"><span>พื้นที่ทำงาน</span><span aria-hidden="true">/</span><strong>ภาพรวม</strong></div>
+        <div class="top-actions"><span class="updated" id="lastUpdated">กำลังโหลดข้อมูล…</span>
+          <button class="refresh" id="refreshButton" type="button" aria-label="รีเฟรชข้อมูล">
+            <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.7-2L20 12M4 12l2.7 5a7 7 0 0 0 11.7-2"/></svg>รีเฟรช
+          </button>
+        </div>
+      </header>
 
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-        <div class="text-xs text-slate-400">Total Trades</div>
-        <div id="statTotal" class="text-2xl font-bold mt-1 text-slate-100">0</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-        <div class="text-xs text-slate-400">Win Rate</div>
-        <div id="statWinRate" class="text-2xl font-bold mt-1 text-slate-100">0.0%</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-        <div class="text-xs text-slate-400">Net Profit (USD)</div>
-        <div id="statPnlUsd" class="text-2xl font-bold mt-1 text-slate-100">$0.00</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-        <div class="text-xs text-slate-400">Net Return (R)</div>
-        <div id="statPnlR" class="text-2xl font-bold mt-1 text-slate-100">+0.0R</div>
-      </div>
-    </div>
+      <div class="content">
+        <section class="page-heading" aria-labelledby="pageTitle">
+          <div><p class="eyebrow">TRADING OVERVIEW</p><h1 id="pageTitle">ภาพรวมระบบ</h1><p class="subtitle">สถานะการเชื่อมต่อและผลการทำงานของ XAUUSD</p></div>
+          <div class="symbol-chip"><span class="gold-dot"></span>XAUUSD <span class="muted">· M5</span></div>
+        </section>
 
-    <!-- Main Grid: Recent Decisions & Active Knowledge -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        <section class="status-grid" aria-label="สถานะระบบ">
+          <article class="status-card">
+            <span class="status-icon" id="bridgeIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12a7 7 0 0 1 14 0M8 12a4 4 0 0 1 8 0M11 12a1 1 0 0 1 2 0v7h-2z"/></svg></span>
+            <div class="status-copy"><div class="status-title">Trading bridge</div><div class="status-value" id="bridgeStatus">กำลังตรวจสอบ…</div><div class="status-sub" id="modelStatus">—</div></div><span class="state-pill" id="bridgePill">ตรวจสอบ</span>
+          </article>
+          <article class="status-card">
+            <span class="status-icon pending" id="feedIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M7 8h.01M11 8h.01M15 8h.01M7 12h10M7 16h6"/></svg></span>
+            <div class="status-copy"><div class="status-title">ข้อมูลจาก MT5</div><div class="status-value" id="feedStatus">รอข้อมูลแท่งราคา</div><div class="status-sub" id="feedSub">ยังไม่มีการตัดสินใจที่บันทึกไว้</div></div><span class="state-pill warn" id="feedPill">รอข้อมูล</span>
+          </article>
+          <article class="status-card">
+            <span class="status-icon pending" id="modeIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4.5 6v5c0 5 3.2 8.3 7.5 10 4.3-1.7 7.5-5 7.5-10V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <div class="status-copy"><div class="status-title">โหมดคำสั่ง</div><div class="status-value" id="modeStatus">กำลังตรวจสอบ…</div><div class="status-sub" id="modeSub">สถานะจากการตั้งค่า service</div></div><span class="state-pill warn" id="modePill">ตรวจสอบ</span>
+          </article>
+        </section>
 
-      <!-- Left Column: AI Decision Stream (2 Cols) -->
-      <div class="lg:col-span-2 space-y-6">
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
-            <span>⚡</span> Realtime AI Decisions
-          </h2>
-          <div class="overflow-x-auto mt-4">
-            <table class="w-full text-left text-sm">
-              <thead class="text-xs uppercase bg-slate-800/60 text-slate-400">
-                <tr>
-                  <th class="p-2.5">Bar Time</th>
-                  <th class="p-2.5">Action</th>
-                  <th class="p-2.5">Regime</th>
-                  <th class="p-2.5">Conf</th>
-                  <th class="p-2.5">Reason</th>
-                </tr>
-              </thead>
-              <tbody id="decisionsTable" class="divide-y divide-slate-800 text-xs">
-                <tr>
-                  <td colspan="5" class="p-4 text-center text-slate-500">Waiting for market snapshots from MT5...</td>
-                </tr>
-              </tbody>
-            </table>
+        <section class="metrics" aria-label="สถิติจากรายการที่บันทึก">
+          <article class="metric"><div class="metric-top">รายการที่บันทึก<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16M4 10h16M4 15h9M4 20h9"/></svg></div><div class="metric-value" id="statTotal">—</div><div class="metric-note">ข้อมูลในฐานข้อมูลของ bridge</div></article>
+          <article class="metric"><div class="metric-top">อัตราชนะ<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m4 16 5-5 4 3 7-8"/><path d="M15 6h5v5"/></svg></div><div class="metric-value" id="statWinRate">—</div><div class="metric-note">คำนวณเมื่อมีผลเทรดที่บันทึกครบ</div></article>
+          <article class="metric"><div class="metric-top">กำไร/ขาดทุนสุทธิ<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v18m5-14H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="metric-value" id="statPnlUsd">—</div><div class="metric-note">USD · เฉพาะรายการในฐานข้อมูล</div></article>
+          <article class="metric"><div class="metric-top">ผลรวมความเสี่ยง (R)<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19V5h7a4 4 0 0 1 0 8H5m6 0 8 6"/></svg></div><div class="metric-value" id="statPnlR">—</div><div class="metric-note">ค่าว่างได้หากไม่มีข้อมูลความเสี่ยงตั้งต้น</div></article>
+        </section>
+
+        <div class="layout">
+          <div class="column">
+            <section class="panel" id="decisions">
+              <div class="panel-head"><div><h2 class="panel-title">การตัดสินใจล่าสุด</h2><p class="panel-description">คำตอบที่ service บันทึกจากข้อมูลแท่งราคา</p></div><span class="panel-count" id="decisionCount">0 รายการ</span></div>
+              <div class="table-wrap"><table class="responsive-table decision-table"><thead><tr><th>เวลาแท่ง</th><th>คำสั่ง</th><th>สภาวะ</th><th>ความมั่นใจ</th><th>เหตุผล</th></tr></thead><tbody id="decisionsTable"><tr><td colspan="5" class="empty"><strong>ยังไม่มีข้อมูล</strong>รอ MT5 ส่ง market snapshot เข้ามาที่ bridge</td></tr></tbody></table></div>
+            </section>
+
+            <section class="panel" id="trades">
+              <div class="panel-head"><div><h2 class="panel-title">ประวัติรายการ</h2><p class="panel-description">รายการปิดที่ bridge บันทึกไว้</p></div><span class="panel-count" id="tradeCount">0 รายการ</span></div>
+              <div class="table-wrap"><table class="responsive-table trade-table"><thead><tr><th>Ticket</th><th>ทิศทาง</th><th>ราคาเข้า</th><th>ราคาออก</th><th>P&amp;L</th><th>ผลลัพธ์ R</th></tr></thead><tbody id="tradesTable"><tr><td colspan="6" class="empty"><strong>ยังไม่มีประวัติเทรด</strong>เมื่อมีรายการที่บันทึกได้ ประวัติจะแสดงตรงนี้</td></tr></tbody></table></div>
+              <p class="notice">ตัวเลขส่วนนี้อ้างอิงจากฐานข้อมูลของ bridge ไม่ใช่ยอดบัญชี MT5 ปัจจุบัน การเชื่อมบันทึกเปิดและปิดรายการยังต้องทำให้ครบก่อนใช้สถิตินี้ประเมินกลยุทธ์</p>
+            </section>
+          </div>
+
+          <div class="column">
+            <section class="panel" id="notes">
+              <div class="panel-head"><div><h2 class="panel-title">หลักการและบันทึก</h2><p class="panel-description">เนื้อหาที่ระบบอ่านประกอบการตัดสินใจ</p></div></div>
+              <div class="knowledge-list">
+                <details open><summary>กฎการเทรด</summary><pre id="knowledgeRules" class="knowledge-text">กำลังโหลด…</pre></details>
+                <details><summary>แนวทางกลยุทธ์</summary><pre id="knowledgePrefs" class="knowledge-text">กำลังโหลด…</pre></details>
+                <details><summary>สิ่งที่เรียนรู้จากตลาด</summary><pre id="knowledgeInsights" class="knowledge-text">กำลังโหลด…</pre></details>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><div><h2 class="panel-title">ข้อมูล service</h2><p class="panel-description">ค่าที่ bridge รายงานได้ในขณะนี้</p></div></div>
+              <div class="about-list">
+                <div class="about-row"><span>โมเดลที่ตั้งค่า</span><strong id="aboutModel">—</strong></div>
+                <div class="about-row"><span>Gemini API key</span><strong id="aboutKey">—</strong></div>
+                <div class="about-row"><span>โหมด Shadow</span><strong id="aboutShadow">—</strong></div>
+                <div class="about-row"><span>ส่งคำสั่งเทรดจาก service</span><strong>ไม่ส่ง</strong></div>
+                <div class="about-row"><span>รีเฟรชอัตโนมัติ</span><strong>ทุก 15 วินาที</strong></div>
+              </div>
+              <p class="notice">การแสดงว่า bridge ออนไลน์ไม่ได้ยืนยันว่า Gemini ตอบได้ หรือ EA เปิดคำสั่งได้ ให้ตรวจ Journal ของ MT5 ประกอบ</p>
+            </section>
           </div>
         </div>
-
-        <!-- Recent Trades -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
-            <span>📊</span> Trade History
-          </h2>
-          <div class="overflow-x-auto mt-4">
-            <table class="w-full text-left text-sm">
-              <thead class="text-xs uppercase bg-slate-800/60 text-slate-400">
-                <tr>
-                  <th class="p-2.5">Ticket</th>
-                  <th class="p-2.5">Type</th>
-                  <th class="p-2.5">Entry</th>
-                  <th class="p-2.5">Exit</th>
-                  <th class="p-2.5">PnL ($)</th>
-                  <th class="p-2.5">PnL (R)</th>
-                </tr>
-              </thead>
-              <tbody id="tradesTable" class="divide-y divide-slate-800 text-xs">
-                <tr>
-                  <td colspan="6" class="p-4 text-center text-slate-500">No trades recorded yet</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <footer class="footer">Gold Desk · หน้าติดตามสถานะระบบทดลอง · ข้อมูลอัปเดตตามการเชื่อมต่อของ MT5 และ bridge</footer>
       </div>
-
-      <!-- Right Column: Self-Learning Knowledge Base (1 Col) -->
-      <div class="space-y-6">
-        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-          <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
-            <span>📖</span> AI Knowledge & Rules
-          </h2>
-          <p class="text-xs text-slate-400 mt-1">กฎและหลักคิดที่ AI ปรับปรุงตัวเองอย่างต่อเนื่อง</p>
-
-          <div class="mt-4 space-y-3">
-            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs" open>
-              <summary class="font-medium text-amber-300 cursor-pointer">📜 Current Trading Rules</summary>
-              <pre id="knowledgeRules" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading rules...</pre>
-            </details>
-
-            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs">
-              <summary class="font-medium text-amber-300 cursor-pointer">🎯 Strategy Preferences</summary>
-              <pre id="knowledgePrefs" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading preferences...</pre>
-            </details>
-
-            <details class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 text-xs">
-              <summary class="font-medium text-amber-300 cursor-pointer">💡 Market Insights & Lessons</summary>
-              <pre id="knowledgeInsights" class="mt-2 text-slate-300 whitespace-pre-wrap font-mono text-[11px] max-h-60 overflow-y-auto">Loading insights...</pre>
-            </details>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
+    </main>
   </div>
 
+  <nav class="mobile-nav" aria-label="เมนูมือถือ">
+    <a class="active" href="#overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>ภาพรวม</a>
+    <a href="#decisions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>ตัดสินใจ</a>
+    <a href="#trades"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5m0 14h17M7 15l4-5 3 2 5-7"/></svg>ประวัติ</a>
+    <a href="#notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/></svg>บันทึก</a>
+  </nav>
+
   <script>
-    async function loadData() {
-      try {
-        // Performance
-        const perfRes = await fetch('/api/performance');
-        const perf = await perfRes.json();
-        document.getElementById('statTotal').innerText = perf.total_trades || 0;
-        document.getElementById('statWinRate').innerText = (perf.win_rate || 0) + '%';
-        document.getElementById('statPnlUsd').innerText = '$' + (perf.net_pnl_usd || 0).toFixed(2);
-        document.getElementById('statPnlR').innerText = (perf.net_pnl_r >= 0 ? '+' : '') + (perf.net_pnl_r || 0).toFixed(1) + 'R';
+    const byId = (id) => document.getElementById(id);
+    const money = (value) => Number.isFinite(Number(value)) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value)) : '—';
+    const numeric = (value, digits = 2) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
 
-        // Decisions
-        const decRes = await fetch('/api/decisions');
-        const decisions = await decRes.json();
-        if (decisions.length > 0) {
-          const rows = decisions.slice(0, 15).map(d => {
-            const badgeClass = d.action === 'BUY' ? 'text-emerald-400 font-bold' : (d.action === 'SELL' ? 'text-rose-400 font-bold' : 'text-slate-400');
-            return `<tr>
-              <td class="p-2.5 text-slate-400">${d.bar_time}</td>
-              <td class="p-2.5 ${badgeClass}">${d.action}</td>
-              <td class="p-2.5 text-slate-300">${d.regime}</td>
-              <td class="p-2.5 text-amber-300">${(d.confidence * 100).toFixed(0)}%</td>
-              <td class="p-2.5 text-slate-400 truncate max-w-xs" title="${d.reason}">${d.reason}</td>
-            </tr>`;
-          }).join('');
-          document.getElementById('decisionsTable').innerHTML = rows;
-        }
-
-        // Trades
-        const tradeRes = await fetch('/api/trades');
-        const trades = await tradeRes.json();
-        if (trades.length > 0) {
-          const rows = trades.slice(0, 10).map(t => {
-            const pnlColor = (t.pnl_usd || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400';
-            return `<tr>
-              <td class="p-2.5">${t.ticket}</td>
-              <td class="p-2.5">${t.direction}</td>
-              <td class="p-2.5">${(t.entry_price || 0).toFixed(2)}</td>
-              <td class="p-2.5">${(t.close_price || 0).toFixed(2)}</td>
-              <td class="p-2.5 ${pnlColor}">$${(t.pnl_usd || 0).toFixed(2)}</td>
-              <td class="p-2.5 ${pnlColor}">${(t.pnl_r || 0).toFixed(2)}R</td>
-            </tr>`;
-          }).join('');
-          document.getElementById('tradesTable').innerHTML = rows;
-        }
-
-        // Knowledge
-        const knowRes = await fetch('/api/knowledge');
-        const know = await knowRes.json();
-        document.getElementById('knowledgeRules').innerText = know.trading_rules || 'No rules found.';
-        document.getElementById('knowledgePrefs').innerText = know.strategy_preferences || 'No preferences found.';
-        document.getElementById('knowledgeInsights').innerText = know.market_insights || 'No insights recorded yet.';
-
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-      }
+    function setPill(id, text, kind) {
+      const pill = byId(id);
+      pill.textContent = text;
+      pill.className = `state-pill${kind ? ` ${kind}` : ''}`;
+    }
+    function localDate(value) {
+      if (!value) return null;
+      const normalized = String(value).replace(/\.(\d{2})\.(\d{2})\s/, '-$1-$2T');
+      const parsed = new Date(normalized);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    function timeLabel(value) {
+      const date = localDate(value);
+      if (!date) return value || '—';
+      return new Intl.DateTimeFormat('th-TH', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+    }
+    function safeCell(row, value, className = '') {
+      const cell = document.createElement('td');
+      if (className) cell.className = className;
+      cell.textContent = value == null ? '—' : String(value);
+      row.appendChild(cell);
+      return cell;
+    }
+    function emptyRow(body, colspan, title, message) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = colspan;
+      cell.className = 'empty';
+      const strong = document.createElement('strong');
+      strong.textContent = title;
+      cell.append(strong, document.createTextNode(message));
+      row.appendChild(cell);
+      body.replaceChildren(row);
     }
 
+    async function fetchJson(path) {
+      const response = await fetch(path, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+      return response.json();
+    }
+    async function loadData() {
+      byId('refreshButton').disabled = true;
+      byId('refreshIcon').style.transform = 'rotate(90deg)';
+      const results = await Promise.allSettled([
+        fetchJson('/health'), fetchJson('/api/performance'), fetchJson('/api/decisions'), fetchJson('/api/trades'), fetchJson('/api/knowledge')
+      ]);
+      const [healthResult, perfResult, decisionsResult, tradesResult, knowledgeResult] = results;
+
+      if (healthResult.status === 'fulfilled') {
+        const health = healthResult.value;
+        const online = health.status === 'online';
+        byId('bridgeStatus').textContent = online ? 'เชื่อมต่อ service แล้ว' : 'service ยังไม่พร้อม';
+        byId('modelStatus').textContent = `โมเดล ${health.model || 'ไม่ระบุ'}`;
+        byId('aboutModel').textContent = health.model || 'ไม่ระบุ';
+        byId('aboutKey').textContent = health.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ยังไม่ได้ตั้งค่า';
+        byId('bridgeIcon').className = `status-icon${online ? '' : ' offline'}`;
+        setPill('bridgePill', online ? 'ออนไลน์' : 'ขัดข้อง', online ? '' : 'down');
+        const shadow = Boolean(health.shadow_mode);
+        byId('modeStatus').textContent = shadow ? 'Shadow mode' : 'เสนอคำสั่งให้ EA';
+        byId('modeSub').textContent = `Cloud ไม่ส่งคำสั่งเข้าโบรกเกอร์ · Gemini API ${health.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ยังไม่ตั้งค่า'}`;
+        byId('aboutShadow').textContent = shadow ? 'เปิด' : 'ปิด';
+        byId('modeIcon').className = `status-icon${shadow ? ' pending' : ''}`;
+        setPill('modePill', shadow ? 'ไม่ส่งออเดอร์' : 'EA คุมการส่ง', shadow ? 'warn' : '');
+      } else {
+        byId('bridgeStatus').textContent = 'ติดต่อ service ไม่ได้';
+        byId('modelStatus').textContent = 'ลองรีเฟรชหรือตรวจ terminal';
+        byId('bridgeIcon').className = 'status-icon offline';
+        setPill('bridgePill', 'ออฟไลน์', 'down');
+      }
+
+      if (decisionsResult.status === 'fulfilled') {
+        const decisions = decisionsResult.value;
+        byId('decisionCount').textContent = `${decisions.length} รายการ`;
+        const latest = decisions[0];
+        if (latest) {
+          byId('feedStatus').textContent = `พบข้อมูล ${latest.symbol || 'XAUUSD'} · ${latest.timeframe || 'M5'}`;
+          byId('feedSub').textContent = `แท่งล่าสุด ${timeLabel(latest.bar_time)}`;
+          byId('feedIcon').className = 'status-icon';
+          setPill('feedPill', 'มีข้อมูล', '');
+        } else {
+          byId('feedStatus').textContent = 'รอข้อมูลแท่งราคา';
+          byId('feedSub').textContent = 'ยังไม่มีการตัดสินใจที่บันทึกไว้';
+          byId('feedIcon').className = 'status-icon pending';
+          setPill('feedPill', 'รอข้อมูล', 'warn');
+        }
+        const body = byId('decisionsTable');
+        if (!decisions.length) emptyRow(body, 5, 'ยังไม่มีข้อมูล', 'รอ MT5 ส่ง market snapshot เข้ามาที่ bridge');
+        else {
+          body.replaceChildren();
+          decisions.slice(0, 15).forEach((decision) => {
+            const row = document.createElement('tr');
+            safeCell(row, timeLabel(decision.bar_time), 'numeric muted');
+            const action = safeCell(row, decision.action || '—');
+            action.innerHTML = '';
+            const badge = document.createElement('span');
+            const actionName = String(decision.action || 'NO_TRADE').toUpperCase();
+            badge.className = `action-pill action-${actionName.toLowerCase()}`;
+            badge.textContent = actionName.replace('_', ' ');
+            action.appendChild(badge);
+            safeCell(row, (decision.regime || '—').replaceAll('_', ' '));
+            safeCell(row, Number.isFinite(Number(decision.confidence)) ? `${(Number(decision.confidence) * 100).toFixed(0)}%` : '—', 'confidence');
+            const reason = safeCell(row, decision.reason || '—', 'reason');
+            reason.title = decision.reason || '';
+            body.appendChild(row);
+          });
+        }
+      } else {
+        byId('feedStatus').textContent = 'อ่านข้อมูล MT5 ไม่สำเร็จ';
+        byId('feedSub').textContent = 'ตรวจ log ของ service';
+        byId('feedIcon').className = 'status-icon offline';
+        setPill('feedPill', 'ผิดพลาด', 'down');
+      }
+
+      if (perfResult.status === 'fulfilled') {
+        const perf = perfResult.value;
+        const total = Number(perf.total_trades || 0);
+        byId('statTotal').textContent = String(total);
+        byId('statWinRate').textContent = total ? `${numeric(perf.win_rate, 1)}%` : '—';
+        byId('statPnlUsd').textContent = total ? money(perf.net_pnl_usd) : '—';
+        byId('statPnlR').textContent = total && Number.isFinite(Number(perf.net_pnl_r)) ? `${Number(perf.net_pnl_r) > 0 ? '+' : ''}${numeric(perf.net_pnl_r, 1)}R` : '—';
+        byId('statPnlUsd').className = `metric-value${Number(perf.net_pnl_usd) > 0 ? ' positive' : (Number(perf.net_pnl_usd) < 0 ? ' negative' : '')}`;
+        byId('statPnlR').className = `metric-value${Number(perf.net_pnl_r) > 0 ? ' positive' : (Number(perf.net_pnl_r) < 0 ? ' negative' : '')}`;
+      }
+
+      if (tradesResult.status === 'fulfilled') {
+        const trades = tradesResult.value;
+        byId('tradeCount').textContent = `${trades.length} รายการ`;
+        const body = byId('tradesTable');
+        if (!trades.length) emptyRow(body, 6, 'ยังไม่มีประวัติเทรด', 'เมื่อมีรายการที่บันทึกได้ ประวัติจะแสดงตรงนี้');
+        else {
+          body.replaceChildren();
+          trades.slice(0, 12).forEach((trade) => {
+            const row = document.createElement('tr');
+            safeCell(row, `#${trade.ticket ?? '—'}`, 'numeric muted');
+            safeCell(row, trade.direction || '—');
+            safeCell(row, numeric(trade.entry_price), 'numeric');
+            safeCell(row, numeric(trade.close_price), 'numeric');
+            const pnl = Number(trade.pnl_usd);
+            safeCell(row, Number.isFinite(pnl) ? money(pnl) : '—', `numeric ${pnl > 0 ? 'positive' : (pnl < 0 ? 'negative' : '')}`);
+            const r = Number(trade.pnl_r);
+            safeCell(row, Number.isFinite(r) ? `${r > 0 ? '+' : ''}${r.toFixed(2)}R` : '—', `numeric ${r > 0 ? 'positive' : (r < 0 ? 'negative' : '')}`);
+            body.appendChild(row);
+          });
+        }
+      }
+
+      if (knowledgeResult.status === 'fulfilled') {
+        const knowledge = knowledgeResult.value;
+        byId('knowledgeRules').textContent = knowledge.trading_rules || 'ยังไม่มีการบันทึกกฎ';
+        byId('knowledgePrefs').textContent = knowledge.strategy_preferences || 'ยังไม่มีแนวทางกลยุทธ์';
+        byId('knowledgeInsights').textContent = knowledge.market_insights || 'ยังไม่มีบทเรียนที่บันทึก';
+      }
+
+      const now = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+      byId('lastUpdated').textContent = `อัปเดตล่าสุด ${now}`;
+      byId('refreshButton').disabled = false;
+      byId('refreshIcon').style.transform = '';
+    }
+
+    byId('refreshButton').addEventListener('click', loadData);
     loadData();
     setInterval(loadData, 15000);
+
+    document.querySelectorAll('.nav a, .mobile-nav a').forEach((link) => {
+      link.addEventListener('click', () => {
+        document.querySelectorAll('.nav a, .mobile-nav a').forEach((item) => item.classList.remove('active'));
+        document.querySelectorAll(`a[href="${link.getAttribute('href')}"]`).forEach((item) => item.classList.add('active'));
+      });
+    });
   </script>
 </body>
 </html>
