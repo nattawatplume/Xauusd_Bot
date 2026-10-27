@@ -35,7 +35,7 @@ input long            MagicNumber       = 234568; // separate from the legacy EA
 input bool   AIEnableTrading           = false; // orders are sent only after this is explicitly enabled
 input bool   AIShadowMode              = true;  // ask AI and log signals, but never place an order
 input bool   EnableLegacySignalFallback= false; // leave false: this new EA should not silently use old rules
-input string AIBridgeURL               = "http://127.0.0.1:8765/v1/decision";
+input string AIBridgeURL               = "http://127.0.0.1:8766/v1/decision"; // Cloud AI service; the local Ollama bridge uses :8765
 input string AIBridgeToken             = ""; // Set this in EA Inputs; never store the bridge secret in source control.
 input int    AITimeoutMs               = 20000;
 input double AIConfidenceMin           = 0.50; // allow balanced high-probability setups
@@ -638,7 +638,7 @@ string BuildAIPayload()
       "\"ema20_m15\":%.5f,\"ema50_m15\":%.5f,\"adx_m15\":%.2f,\"atr_m15\":%.5f,"
       "\"high_impact_usd_events\":%s,\"candles_m5\":%s,\"chart_candles_m5\":%s,\"open_positions\":%s,"
       "\"constraints\":{\"confidence_min\":%.2f,\"stop_atr_min\":%.2f,\"stop_atr_max\":%.2f,"
-      "\"target_r_min\":%.2f,\"target_r_max\":%.2f}}",
+      "\"target_r_min\":%.2f,\"target_r_max\":%.2f,\"min_risk_atr\":%.2f,\"max_hold_bars\":%d}}",
       JsonEscape(_Symbol), JsonEscape(timeframe), TimeToString(barTime, TIME_DATE|TIME_MINUTES), TimeToString(TimeTradeServer(), TIME_DATE|TIME_MINUTES),
       JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)),
       tick.bid, tick.ask, (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD),
@@ -649,7 +649,7 @@ string BuildAIPayload()
       AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_BALANCE), pos, posProfit,
       atrM5, rsi, ema9, ema21, ema20, ema50, adx, atrM15,
       HighImpactCalendarJson(), candles, chartCandles, openPositions,
-      AIConfidenceMin, AIMinStopATR, AIMaxStopATR, AIMinTargetR, AIMaxTargetR);
+      AIConfidenceMin, AIMinStopATR, AIMaxStopATR, AIMinTargetR, AIMaxTargetR, MinRiskATR, MaxHoldBars);
 }
 
 void SendDashboardMarketSnapshot()
@@ -1387,6 +1387,86 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
+//| Trade ledger: report entries and exits to the Cloud AI service    |
+//+------------------------------------------------------------------+
+int PostBridgeJson(string path, string payload, int timeoutMs)
+{
+   string url = AIBridgeURL;
+   if(StringFind(url, "/v1/decision") < 0) return -1;
+   StringReplace(url, "/v1/decision", path);
+   char req[], resp[];
+   StringToCharArray(payload, req, 0, WHOLE_ARRAY, CP_UTF8);
+   if(ArraySize(req) > 0) ArrayResize(req, ArraySize(req) - 1);
+   string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
+   string respHeaders;
+   ResetLastError();
+   return WebRequest("POST", url, headers, timeoutMs, req, resp, respHeaders);
+}
+
+void NotifyTradeOpened(ulong dealTicket)
+{
+   ulong positionId = (ulong)HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+   bool isBuy = HistoryDealGetInteger(dealTicket, DEAL_TYPE) == DEAL_TYPE_BUY;
+   double price = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+   double volume = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+   datetime openTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+   double sl = HistoryDealGetDouble(dealTicket, DEAL_SL);
+   double tp = HistoryDealGetDouble(dealTicket, DEAL_TP);
+   if(PositionSelectByTicket(positionId))
+   {
+      sl = PositionGetDouble(POSITION_SL);
+      tp = PositionGetDouble(POSITION_TP);
+   }
+   // Cash at risk at the initial stop: the denominator for the trade's R multiple.
+   double riskUsd = 0, stopProfit = 0;
+   if(sl > 0 && OrderCalcProfit(isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, _Symbol, volume, price, sl, stopProfit) && stopProfit < 0)
+      riskUsd = -stopProfit;
+
+   string payload = StringFormat(
+      "{\"ticket\":%I64u,\"symbol\":\"%s\",\"direction\":\"%s\",\"entry_price\":%.5f,\"volume\":%.8f,"
+      "\"sl_price\":%.5f,\"tp_price\":%.5f,\"risk_usd\":%.2f,\"open_time\":\"%s\"}",
+      positionId, JsonEscape(_Symbol), isBuy ? "BUY" : "SELL", price, volume, sl, tp, riskUsd,
+      TimeToString(openTime, TIME_DATE|TIME_MINUTES));
+   int status = PostBridgeJson("/v1/trade_opened", payload, 3000);
+   PrintFormat("Cloud AI trade opened sent: position=%I64u status=%d risk=%.2f", positionId, status, riskUsd);
+}
+
+void NotifyTradeClosed(ulong dealTicket)
+{
+   ulong positionId = (ulong)HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+   double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+   datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+   if(!HistorySelectByPosition(positionId)) return;
+
+   // Net result of the whole position: profit, swap and commission of every deal.
+   double net = 0, entryPrice = 0, volume = 0;
+   datetime openTime = 0;
+   bool isBuy = true;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+   {
+      ulong d = HistoryDealGetTicket(i);
+      if(d == 0) continue;
+      net += HistoryDealGetDouble(d, DEAL_PROFIT) + HistoryDealGetDouble(d, DEAL_SWAP) +
+             HistoryDealGetDouble(d, DEAL_COMMISSION);
+      if(HistoryDealGetInteger(d, DEAL_ENTRY) == DEAL_ENTRY_IN && openTime == 0)
+      {
+         isBuy = HistoryDealGetInteger(d, DEAL_TYPE) == DEAL_TYPE_BUY;
+         entryPrice = HistoryDealGetDouble(d, DEAL_PRICE);
+         volume = HistoryDealGetDouble(d, DEAL_VOLUME);
+         openTime = (datetime)HistoryDealGetInteger(d, DEAL_TIME);
+      }
+   }
+
+   string payload = StringFormat(
+      "{\"ticket\":%I64u,\"symbol\":\"%s\",\"direction\":\"%s\",\"entry_price\":%.5f,\"volume\":%.8f,"
+      "\"close_price\":%.5f,\"pnl_usd\":%.2f,\"cumulative\":true,\"open_time\":\"%s\",\"close_time\":\"%s\"}",
+      positionId, JsonEscape(_Symbol), isBuy ? "BUY" : "SELL", entryPrice, volume, closePrice, net,
+      TimeToString(openTime, TIME_DATE|TIME_MINUTES), TimeToString(closeTime, TIME_DATE|TIME_MINUTES));
+   int status = PostBridgeJson("/v1/trade_closed", payload, 5000);
+   PrintFormat("Cloud AI trade closed sent: position=%I64u status=%d net=%.2f", positionId, status, net);
+}
+
+//+------------------------------------------------------------------+
 //| แจ้งเตือนเมื่อไม้ปิดไปยัง Cloud AI เพื่อทำ Reflection และการเรียนรู้  |
 //+------------------------------------------------------------------+
 void OnTradeTransaction(const MqlTradeTransaction& trans,
@@ -1405,31 +1485,10 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
          {
             // Update the dashboard from the terminal before any slower reflection call.
             SendPositionSnapshot();
-            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
-            {
-               double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
-               double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
-               datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
-
-               string payload = StringFormat(
-                  "{\"ticket\":%I64u,\"symbol\":\"%s\",\"close_price\":%.2f,\"pnl_usd\":%.2f,\"close_time\":\"%s\"}",
-                  dealTicket, symbol, closePrice, profit, TimeToString(closeTime, TIME_DATE|TIME_SECONDS)
-               );
-
-               char req[], resp[];
-               StringToCharArray(payload, req, 0, WHOLE_ARRAY, CP_UTF8);
-               if(ArraySize(req) > 0) ArrayResize(req, ArraySize(req) - 1);
-               string headers = "Content-Type: application/json\r\nX-Bridge-Token: " + AIBridgeToken + "\r\n";
-               string respHeaders;
-
-               string closeUrl = AIBridgeURL;
-               StringReplace(closeUrl, "/v1/decision", "/v1/trade_closed");
-
-               ResetLastError();
-               int status = WebRequest("POST", closeUrl, headers, 5000, req, resp, respHeaders);
-               PrintFormat("Cloud AI Trade Reflection sent: ticket=%I64u status=%d profit=%.2f", dealTicket, status, profit);
-            }
-
+            if(entry == DEAL_ENTRY_IN)
+               NotifyTradeOpened(dealTicket);
+            else if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_OUT_BY)
+               NotifyTradeClosed(dealTicket);
          }
       }
       return;

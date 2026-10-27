@@ -6,7 +6,7 @@ This repository contains an experimental MetaTrader 5 Expert Advisor and a Pytho
 
 The separate [`AI_XAU_V1`](AI_XAU_V1/README.md) directory contains a local-model MT5 bridge prototype. The legacy EA and its backtests remain unchanged. The AI prototype defaults to shadow mode and requires local Ollama plus an explicit MT5 WebRequest allow-list. It has not been compiled in MetaEditor or validated on a demo account; review its setup and limitations before use.
 
-The separate [`cloud_ai_trader`](cloud_ai_trader/README.md) directory is an experimental Gemini-backed service prototype. It is not yet a complete trade ledger or a validated autonomous trader; review its limitations and keep its API private.
+The separate [`cloud_ai_trader`](cloud_ai_trader/README.md) directory is an experimental Gemini-backed service: rule-based setup candidates, an LLM approve/veto step, a broker-confirmed trade ledger, shadow outcome tracking and the Gold Desk dashboard. A backtest of its candidate rules on the broker's M5 history was negative after costs (about -0.05R per trade, PF 0.90; see [RESEARCH.md](RESEARCH.md)), so keep it in shadow mode until the shadow tracker shows that AI-approved setups clearly outperform rejected ones. Keep its API private.
 
 ## Current EA behavior
 

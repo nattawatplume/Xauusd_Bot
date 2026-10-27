@@ -20,12 +20,19 @@ class Settings(BaseSettings):
     # Server
     # Bind locally by default. Put a TLS reverse proxy in front before remote access.
     HOST: str = "127.0.0.1"
-    PORT: int = 8765
+    PORT: int = 8766
 
     # LLM
     LLM_MODEL: str = "gemini-3.6-flash"
+    # Used when the primary model is overloaded (HTTP 503) or slow.
+    LLM_FALLBACK_MODEL: str = "gemini-3.5-flash-lite"
     LLM_TEMPERATURE: float = 0.1
-    LLM_MAX_RETRIES: int = 3
+    LLM_MAX_RETRIES: int = 2
+    LLM_TIMEOUT_S: float = 8.0
+    # "low" roughly halves Gemini 3 latency; empty string uses the model default.
+    LLM_THINKING_LEVEL: str = "low"
+    # Whole decision must finish before the EA's AITimeoutMs (20 s default).
+    DECISION_BUDGET_S: float = 15.0
 
     # Reference limits only. Live risk checks are currently enforced by the MT5 EA,
     # not independently by this proposal service.
@@ -59,6 +66,12 @@ class Settings(BaseSettings):
     # Scheduler
     DAILY_REVIEW_HOUR: int = 22       # UTC hour for daily review
     WEEKLY_REVIEW_DAY: int = 5        # Saturday (0=Mon, 5=Sat, 6=Sun in APScheduler standard)
+
+    # Shadow tracking: how candidate setups are scored when the AI did not set a plan.
+    SHADOW_DEFAULT_STOP_ATR: float = 1.5
+    SHADOW_DEFAULT_TARGET_R: float = 1.5
+    SHADOW_MIN_RISK_ATR: float = 1.0  # mirrors the EA MinRiskATR input
+    SHADOW_MAX_HOLD_BARS: int = 12    # mirrors the EA MaxHoldBars input
 
     # Shadow mode
     SHADOW_MODE: bool = True          # Label proposals; the EA enforces no-order shadow mode

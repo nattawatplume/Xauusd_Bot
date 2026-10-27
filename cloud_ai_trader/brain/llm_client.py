@@ -15,6 +15,20 @@ from config import settings
 
 log = logging.getLogger("ai_trader.llm")
 
+DECISION_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "action": {"type": "STRING", "enum": ["BUY", "SELL", "NO_TRADE", "EXIT"]},
+        "confidence": {"type": "NUMBER"},
+        "regime": {"type": "STRING", "enum": ["trending_up", "trending_down", "ranging", "breakout", "high_volatility", "pre_news", "unclear"]},
+        "setup": {"type": "STRING", "enum": ["pullback", "breakout", "none"]},
+        "stop_atr": {"type": "NUMBER"},
+        "target_r": {"type": "NUMBER"},
+        "reason": {"type": "STRING"},
+    },
+    "required": ["action", "confidence", "regime", "setup", "stop_atr", "target_r", "reason"],
+}
+
 
 class LLMClient:
     """Async client communicating with Google Gemini models."""
@@ -30,11 +44,13 @@ class LLMClient:
         system_instruction: str,
         prompt: str,
         response_schema: dict[str, Any] | None = None,
+        model: str | None = None,
+        timeout: float | None = None,
     ) -> str:
         """Call Gemini REST API asynchronously using run_in_executor."""
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self.model}:generateContent"
+            f"{model or self.model}:generateContent"
         )
 
         contents: list[dict[str, Any]] = [
@@ -47,6 +63,8 @@ class LLMClient:
         }
         if response_schema:
             generation_config["responseSchema"] = response_schema
+        if settings.LLM_THINKING_LEVEL:
+            generation_config["thinkingConfig"] = {"thinkingLevel": settings.LLM_THINKING_LEVEL}
 
         payload = {
             "contents": contents,
@@ -68,7 +86,7 @@ class LLMClient:
         )
 
         def _execute() -> str:
-            with urlopen(req, timeout=20) as resp:
+            with urlopen(req, timeout=timeout or settings.LLM_TIMEOUT_S) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             candidates = data.get("candidates", [])
             if not candidates:
@@ -87,67 +105,60 @@ class LLMClient:
         user_content: str,
         response_schema: dict[str, Any] | None = None,
         default_fallback: dict[str, Any] | None = None,
+        budget_s: float | None = None,
     ) -> dict[str, Any]:
-        """Generate structured JSON with retry logic and safe fail-closed fallback."""
+        """Generate structured JSON within a time budget, then fail closed.
+
+        Order: primary model, the lighter fallback model, then the primary again
+        while time remains. Each attempt is capped by LLM_TIMEOUT_S and by the
+        remaining budget so the EA always gets an answer before its own timeout.
+        Failure is marked with "_llm_error" so callers can tell a real NO_TRADE
+        from an unavailable model.
+        """
+        fallback = dict(default_fallback or {})
         if not self.api_key:
             log.warning("GEMINI_API_KEY is not set. Returning safe default.")
-            return default_fallback or {}
+            return {**fallback, "_llm_error": "no_api_key"}
 
-        for attempt in range(1, self.max_retries + 1):
+        attempts = [self.model]
+        if settings.LLM_FALLBACK_MODEL and settings.LLM_FALLBACK_MODEL != self.model:
+            attempts.append(settings.LLM_FALLBACK_MODEL)
+        attempts += [self.model] * max(0, self.max_retries - 1)
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + budget_s if budget_s else None
+        last_error = "unknown"
+        for attempt, model in enumerate(attempts, start=1):
+            timeout = settings.LLM_TIMEOUT_S
+            if deadline is not None:
+                timeout = min(timeout, deadline - loop.time() - 0.2)
+                if timeout < 1.0:
+                    last_error = "time_budget"
+                    break
             try:
-                # First attempt SDK if available, else REST API
                 text_response = await self._call_gemini_rest(
                     system_instruction=system_instruction,
                     prompt=user_content,
                     response_schema=response_schema,
+                    model=model,
+                    timeout=timeout,
                 )
                 parsed = json.loads(text_response)
                 if isinstance(parsed, dict):
+                    parsed["_model"] = model
                     return parsed
+                last_error = "non_dict_json"
                 log.warning("LLM response was not a JSON dictionary: %s", text_response[:100])
             except Exception as exc:
-                delay = 2**attempt
-                log.warning(
-                    "LLM call attempt %d failed: %s. Retrying in %ds...",
-                    attempt,
-                    exc,
-                    delay,
-                )
-                if attempt < self.max_retries:
-                    await asyncio.sleep(delay)
-                else:
-                    log.error("All %d LLM attempts failed.", self.max_retries)
+                last_error = type(exc).__name__
+                log.warning("LLM attempt %d (%s) failed: %s", attempt, model, exc)
 
-        return default_fallback or {}
-
-    async def analyze_market(
-        self,
-        snapshot: dict[str, Any],
-        system_prompt: str,
-        analysis_prompt: str,
-        market_insights: str,
-    ) -> dict[str, Any]:
-        """Analyze market snapshot and classify regime."""
-        user_data = {
-            "market_snapshot": snapshot,
-            "accumulated_insights": market_insights,
-        }
-        fallback = {
-            "regime": "unclear",
-            "regime_confidence": 0.0,
-            "key_levels": {"support": [], "resistance": []},
-            "volatility": "normal",
-            "news_risk": False,
-            "summary": "Fallback: analysis unavailable",
-        }
-        return await self.generate_json(
-            system_instruction=f"{system_prompt}\n\n{analysis_prompt}",
-            user_content=json.dumps(user_data, ensure_ascii=False),
-            default_fallback=fallback,
-        )
+        log.error("LLM unavailable after %d attempt(s): %s", attempt, last_error)
+        return {**fallback, "_llm_error": last_error}
 
     async def make_decision(
         self,
+        snapshot: dict[str, Any],
         market_context: dict[str, Any],
         system_prompt: str,
         decision_prompt: str,
@@ -158,6 +169,7 @@ class LLMClient:
     ) -> dict[str, Any]:
         """Decide trade action given market context and self-maintained knowledge."""
         user_data = {
+            "market_snapshot": snapshot,
             "market_context": market_context,
             "trading_rules": rules,
             "strategy_preferences": prefs,

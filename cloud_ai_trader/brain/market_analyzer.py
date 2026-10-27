@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from brain.llm_client import LLMClient
@@ -116,42 +117,44 @@ class MarketAnalyzer:
 
         return candidates
 
+    @staticmethod
+    def _news_risk(snapshot: dict[str, Any], window_minutes: int = 30) -> tuple[bool, str]:
+        """True when an EA-reported high-impact USD event is within the window."""
+        events = snapshot.get("high_impact_usd_events")
+        now_text = str(snapshot.get("server_time") or snapshot.get("bar_time") or "")
+        try:
+            now = datetime.strptime(now_text[:16], "%Y.%m.%d %H:%M")
+        except ValueError:
+            return False, ""
+        if not isinstance(events, list):
+            return False, ""
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            try:
+                at = datetime.strptime(str(event.get("time", ""))[:16], "%Y.%m.%d %H:%M")
+            except ValueError:
+                continue
+            if abs((at - now).total_seconds()) <= window_minutes * 60:
+                return True, str(event.get("name", "high-impact USD event"))[:80]
+        return False, ""
+
     async def analyze(self, snapshot: dict[str, Any]) -> dict[str, Any]:
-        """Run deep AI market analysis using LLM + historical market insights."""
-        system_prompt = self.memory.get_prompt("system_identity.md")
-        analysis_prompt = self.memory.get_prompt("market_analysis.md")
-        insights = self.memory.get_market_insights()
+        """Deterministic market context: regime heuristic, news window and setup candidates.
 
+        The LLM is not asked to classify every bar. It is consulted only by the
+        decision engine, and only when there is a candidate or an open position.
+        """
         heuristic = self._heuristic_regime(snapshot)
-
-        # Call LLM for cognitive reasoning
-        ai_analysis = await self.llm.analyze_market(
-            snapshot=snapshot,
-            system_prompt=system_prompt,
-            analysis_prompt=analysis_prompt,
-            market_insights=insights,
-        )
-
-        # Merge results with safety checks
-        regime = ai_analysis.get("regime") or heuristic["regime"]
-        valid_regimes = {
-            "trending_up",
-            "trending_down",
-            "ranging",
-            "breakout",
-            "high_volatility",
-            "pre_news",
-            "unclear",
-        }
-        if regime not in valid_regimes:
-            regime = heuristic["regime"]
-
+        news_risk, news_name = self._news_risk(snapshot)
+        summary = heuristic["summary"]
+        if news_name:
+            summary = f"{summary}; high-impact news near: {news_name}"
         return {
-            "regime": regime,
-            "regime_confidence": float(ai_analysis.get("regime_confidence", heuristic["regime_confidence"])),
-            "key_levels": ai_analysis.get("key_levels", {"support": [], "resistance": []}),
-            "volatility": ai_analysis.get("volatility", heuristic["volatility"]),
-            "news_risk": bool(ai_analysis.get("news_risk", heuristic["news_risk"])),
-            "summary": str(ai_analysis.get("summary", heuristic["summary"])),
+            "regime": "pre_news" if news_risk else heuristic["regime"],
+            "regime_confidence": heuristic["regime_confidence"],
+            "volatility": heuristic["volatility"],
+            "news_risk": news_risk or heuristic["news_risk"],
+            "summary": summary,
             "technical_candidates": self._technical_candidates(snapshot),
         }

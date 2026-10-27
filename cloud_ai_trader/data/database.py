@@ -139,6 +139,51 @@ def init_db_sync() -> None:
             """
         )
 
+        # Account equity, one row per closed bar reported by the EA
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS equity_snapshots (
+                t INTEGER PRIMARY KEY,
+                balance REAL,
+                equity REAL
+            )
+            """
+        )
+
+        _migrate(cursor)
+
+
+# Columns added after the first release; created on startup for existing databases.
+_MIGRATIONS: dict[str, dict[str, str]] = {
+    "decisions": {
+        "ai_verdict": "TEXT",
+        "llm_model": "TEXT",
+        "candidate_side": "TEXT",
+        "candidate_setup": "TEXT",
+        "signal_t": "INTEGER",
+        "entry_ref": "REAL",
+        "risk_price": "REAL",
+        "target_r_plan": "REAL",
+        "spread_price": "REAL",
+        "outcome": "TEXT",
+        "outcome_r": "REAL",
+        "resolved_bars": "INTEGER",
+    },
+    "trades": {
+        "risk_usd": "REAL",
+    },
+}
+
+
+def _migrate(cursor: sqlite3.Cursor) -> None:
+    for table, columns in _MIGRATIONS.items():
+        existing = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in columns.items():
+            if name not in existing:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_decisions_outcome ON decisions(outcome)")
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trades_ticket ON trades(ticket)")
+
 
 async def init_db() -> None:
     """Async wrapper for initializing tables."""

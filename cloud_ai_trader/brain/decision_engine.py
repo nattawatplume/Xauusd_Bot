@@ -68,8 +68,22 @@ class DecisionEngine:
                 "reason": "Hard Guardrail: market regime is not classified well enough to enter.",
             }
 
+        candidates = market_context.get("technical_candidates") or []
+        if position == "none" and not candidates:
+            # No rule-based setup on this bar: skip the LLM (cost, latency) and stand aside.
+            return {
+                "action": "NO_TRADE",
+                "confidence": 0.0,
+                "regime": regime,
+                "setup": "none",
+                "stop_atr": settings.MIN_STOP_ATR,
+                "target_r": settings.MIN_TARGET_R,
+                "reason": "No technical candidate on this closed bar.",
+                "ai_verdict": "no_candidate",
+            }
+
         # ---------------------------------------------------------------------
-        # Call LLM for Cognitive Decision
+        # Call LLM to approve or veto the candidate (or manage an open position)
         # ---------------------------------------------------------------------
         system_prompt = self.memory.get_prompt("system_identity.md")
         decision_prompt = self.memory.get_prompt("trade_decision.md")
@@ -78,6 +92,7 @@ class DecisionEngine:
         recent_trades = await self.memory.get_recent_trades(limit=5)
 
         ai_res = await self.llm.make_decision(
+            snapshot=snapshot,
             market_context=market_context,
             system_prompt=system_prompt,
             decision_prompt=decision_prompt,
@@ -86,6 +101,7 @@ class DecisionEngine:
             recent_trades=recent_trades,
             account_state=account_state,
         )
+        llm_error = ai_res.get("_llm_error")
 
         action = str(ai_res.get("action", "NO_TRADE")).upper()
         if action not in {"BUY", "SELL", "NO_TRADE", "EXIT"}:
@@ -130,6 +146,13 @@ class DecisionEngine:
             action = "NO_TRADE"
             reason = "Ignored entry: An existing position is already open."
 
+        matching = [c for c in candidates if c.get("side") == action]
+        if action in {"BUY", "SELL"} and not matching:
+            action = "NO_TRADE"
+            reason = "Rejected: AI direction does not match any rule-based candidate."
+        elif matching:
+            setup = matching[0].get("setup", setup)
+
         if action in {"BUY", "SELL"} and confidence < settings.MIN_CONFIDENCE:
             action = "NO_TRADE"
             setup = "none"
@@ -137,6 +160,14 @@ class DecisionEngine:
 
         if action in {"NO_TRADE", "EXIT"}:
             setup = "none"
+
+        if llm_error:
+            verdict = "unavailable"
+            reason = f"AI unavailable ({llm_error}); fail-closed."
+        elif position != "none":
+            verdict = "position"
+        else:
+            verdict = "approved" if action in {"BUY", "SELL"} else "rejected"
 
         return {
             "action": action,
@@ -146,4 +177,6 @@ class DecisionEngine:
             "stop_atr": round(stop_atr, 2),
             "target_r": round(target_r, 2),
             "reason": reason[:200],
+            "ai_verdict": verdict,
+            "llm_model": ai_res.get("_model"),
         }

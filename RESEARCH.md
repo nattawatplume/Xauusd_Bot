@@ -28,3 +28,17 @@ Can a short-term technical rule be called the best or reliably profitable strate
 5. Evaluate net expectancy, profit factor, maximum equity drawdown, loss streak, trade count, and per-session results together. Do not select a variant on win rate alone. If the unchanged rule fails Forward, reject it instead of repeatedly optimizing the same interval.
 
 This process can reject weak candidates; it cannot guarantee future profit or make an intraday strategy risk-free.
+
+## Cloud AI candidate backtest (2026-10-27)
+
+`backtest_ai_candidates.py` replays the Cloud AI service's own `_technical_candidates` function (M15-trend pullback and six-bar breakout on M5) on FBS XAUUSD M5 bars from 2025-05-27 to 2026-10-27, with entry at the next bar open, the bar's recorded spread, 0.05 USD slippage per side, a same-bar stop/target touch counted as a loss, and a 12-bar time exit. The last third is the out-of-sample split.
+
+| Plan | Trades | Win rate | Expectancy | PF |
+|---|---|---|---|---|
+| SL 1.5 ATR, TP 1.5R, costs | 5,429 | 41.5% | -0.054R | 0.90 |
+| same, out-of-sample only | 1,836 | 40.8% | -0.062R | 0.88 |
+| same, no costs | 5,409 | 44.1% | +0.011R | 1.02 |
+| SL 1.0 ATR, TP 2.0R, costs | 6,337 | 33.6% | -0.087R | 0.87 |
+| reversed signals, SL 1.5 ATR, TP 1.5R | 5,681 | 41.8% | -0.066R | 0.88 |
+
+Every stop/target pair, setup type and session window tested was negative after costs. Before costs the candidates are close to breakeven, and reversing them also loses, which is what a signal with no directional information looks like. The LLM layer therefore has to supply the whole edge by vetoing; the service's shadow tracker measures whether its approved setups outperform the ones it rejects. Do not enable trading on the basis of the AI's confidence values or a short sample.

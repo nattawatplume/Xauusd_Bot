@@ -2,763 +2,820 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101918">
-  <meta name="description" content="หน้าควบคุม XAUUSD ที่แสดงข้อมูลราคาและคำสั่งจริงจาก MT5">
-  <title>Aurum Desk · XAUUSD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gold Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      color-scheme: light;
-      --ink: #16211f;
-      --muted: #71807a;
-      --line: #e1e8e3;
-      --paper: #f1f4f1;
-      --card: #fff;
-      --night: #101918;
-      --night-2: #182321;
-      --gold: #d7ad5d;
-      --green: #07865a;
-      --red: #df6261;
-      --blue: #65a8ee;
-      font-family: Inter, "Segoe UI", Tahoma, "Noto Sans Thai", sans-serif;
+      --bg: #f5f5f7;
+      --card: rgba(255, 255, 255, 0.86);
+      --card-solid: #ffffff;
+      --line: rgba(0, 0, 0, 0.07);
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --faint: #a1a1a6;
+      --blue: #0071e3;
+      --green: #1f9d55;
+      --red: #e0352b;
+      --orange: #d97a00;
+      --gold: #b8860b;
+      --green-soft: rgba(52, 199, 89, 0.13);
+      --red-soft: rgba(255, 59, 48, 0.12);
+      --orange-soft: rgba(255, 149, 0, 0.14);
+      --blue-soft: rgba(0, 113, 227, 0.1);
+      --gray-soft: rgba(120, 120, 128, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.06);
+      --nav: rgba(245, 245, 247, 0.72);
+      --radius: 22px;
+      --chart-grid: rgba(0, 0, 0, 0.06);
+      --chart-up: #34c759;
+      --chart-down: #ff3b30;
     }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #000000; --card: rgba(28, 28, 30, 0.82); --card-solid: #1c1c1e; --line: rgba(255, 255, 255, 0.08);
+        --text: #f5f5f7; --muted: #98989d; --faint: #636366; --blue: #2997ff; --green: #30d158; --red: #ff453a;
+        --orange: #ff9f0a; --gold: #e3b341; --nav: rgba(0, 0, 0, 0.66); --chart-grid: rgba(255, 255, 255, 0.07);
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.35); --chart-up: #30d158; --chart-down: #ff453a;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #000000; --card: rgba(28, 28, 30, 0.82); --card-solid: #1c1c1e; --line: rgba(255, 255, 255, 0.08);
+      --text: #f5f5f7; --muted: #98989d; --faint: #636366; --blue: #2997ff; --green: #30d158; --red: #ff453a;
+      --orange: #ff9f0a; --gold: #e3b341; --nav: rgba(0, 0, 0, 0.66); --chart-grid: rgba(255, 255, 255, 0.07);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.35); --chart-up: #30d158; --chart-down: #ff453a;
+    }
+
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin: 0; color: var(--ink); background: var(--paper); font-size: 14px; }
-    button, a { font: inherit; }
-    button { cursor: pointer; }
-    a { color: inherit; text-decoration: none; }
-    .shell { min-height: 100vh; }
-    .sidebar {
-      position: fixed; inset: 0 auto 0 0; z-index: 5; display: flex; flex-direction: column;
-      width: 224px; padding: 23px 15px; color: #e9f0ec; background: var(--night);
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 "Inter", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+      transition: background 0.4s ease, color 0.4s ease;
     }
-    .brand { display: flex; align-items: center; gap: 12px; padding: 3px 10px 29px; }
-    .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #5c563e; border-radius: 11px; color: #efd18c; background: #2a2b21; font-size: 17px; font-weight: 800; }
-    .brand-title { font-size: 14px; font-weight: 750; letter-spacing: .07em; }
-    .brand-sub { margin-top: 3px; color: #93a39a; font-size: 10px; }
-    .nav-caption { padding: 8px 11px; color: #768880; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
-    .nav { display: grid; gap: 4px; }
-    .nav a { display: flex; min-height: 42px; align-items: center; gap: 11px; padding: 0 11px; border-radius: 7px; color: #b3c0b9; transition: color .15s, background .15s; }
-    .nav a:hover, .nav a.active { color: #fff; background: #263530; }
-    .nav a.active { box-shadow: inset 2px 0 var(--gold); }
-    .nav svg { width: 17px; height: 17px; flex: 0 0 auto; }
-    .side-note { margin-top: auto; padding: 13px 10px 0; border-top: 1px solid #28332f; color: #899890; font-size: 10px; line-height: 1.7; }
-    .side-note strong { display: block; margin-bottom: 3px; color: #d7e0da; font-size: 11px; }
-    main { min-height: 100vh; margin-left: 224px; }
-    .topbar { position: sticky; top: 0; z-index: 4; display: flex; height: 59px; align-items: center; justify-content: space-between; padding: 0 30px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.94); backdrop-filter: blur(10px); }
-    .crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
-    .crumb strong { color: var(--ink); font-weight: 650; }
-    .top-right { display: flex; align-items: center; gap: 12px; }
-    .updated { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-    .refresh { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid #dce4de; border-radius: 7px; color: #30403a; background: white; font-size: 11px; }
-    .refresh:hover { border-color: #b3c2b8; background: #f8faf8; }
-    .refresh:disabled { cursor: wait; opacity: .65; }
-    .refresh svg { width: 14px; height: 14px; }
-    .content { width: min(1500px, 100%); margin: 0 auto; padding: 25px 30px 52px; }
-    .heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 17px; }
-    .eyebrow { margin: 0 0 6px; color: #89713d; font-size: 9px; font-weight: 800; letter-spacing: .15em; }
-    h1 { margin: 0; font-size: clamp(23px, 2.2vw, 30px); font-weight: 760; letter-spacing: -.04em; line-height: 1.15; }
-    .subtitle { margin: 7px 0 0; color: var(--muted); font-size: 11px; }
-    .heading-side { display: flex; align-items: center; gap: 8px; }
-    .symbol-label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #dfe6e0; border-radius: 6px; color: #27342f; background: #fff; font-size: 11px; font-weight: 750; white-space: nowrap; }
-    .symbol-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px #f7efd9; }
-    .pill { display: inline-flex; min-height: 23px; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid #dce8df; border-radius: 99px; color: #177349; background: #eff7f1; font-size: 9px; font-weight: 700; white-space: nowrap; }
-    .pill::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
-    .pill.warn { border-color: #efe4c9; color: #956b22; background: #fbf6e8; }
-    .pill.down { border-color: #f1d8d7; color: #b94e4b; background: #fff0ef; }
-    .pill.neutral { border-color: #dfe5e1; color: #66736d; background: #f4f6f4; }
-    .status-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 12px; }
-    .status-item { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); }
-    .status-label { color: var(--muted); font-size: 10px; }
-    .status-value { margin-top: 3px; font-size: 11px; font-weight: 700; }
-    .quotes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 14px; overflow: hidden; border: 1px solid #27332f; border-radius: 8px; color: #e8f0eb; background: #27332f; }
-    .quote { min-height: 77px; padding: 12px 16px; background: var(--night-2); }
-    .quote-label { color: #91a39a; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
-    .quote-value { margin-top: 9px; overflow: hidden; color: #f6f8f6; font-size: clamp(18px, 2vw, 25px); font-weight: 720; letter-spacing: -.035em; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-    .quote-value.bid { color: #82d6a2; }
-    .quote-value.ask { color: #f1c873; }
-    .quote-value.small { font-size: 14px; letter-spacing: 0; }
-    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(295px, .82fr); gap: 13px; align-items: stretch; }
-    .panel { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--card); scroll-margin-top: 72px; }
-    .panel-head { display: flex; min-height: 57px; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 15px; border-bottom: 1px solid #e9eeea; }
-    .panel-title { margin: 0; font-size: 12px; font-weight: 760; letter-spacing: -.01em; }
-    .panel-description { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
-    .chart-panel { color: #e8efea; border-color: #27332f; background: #111a19; }
-    .chart-panel .panel-head { border-bottom-color: #26322e; }
-    .chart-panel .panel-title { color: #f2f5f2; font-size: 13px; }
-    .chart-panel .panel-description { color: #94a49b; }
-    .chart-head-right { display: flex; align-items: center; gap: 9px; }
-    .chart-badge { padding: 5px 7px; border: 1px solid #35443e; border-radius: 4px; color: #c8d6ce; background: #1b2723; font-size: 9px; white-space: nowrap; }
-    .chart-state { color: #a6b7ad; font-size: 9px; text-align: right; }
-    .chart-wrap { position: relative; height: 350px; padding: 0 2px; }
-    #priceChart { display: block; width: 100%; height: 100%; }
-    .chart-empty { position: absolute; inset: 0; display: grid; place-content: center; padding: 20px; color: #a6b3ac; text-align: center; pointer-events: none; }
-    .chart-empty[hidden] { display: none; }
-    .chart-empty strong { margin-bottom: 7px; color: #e3eae5; font-size: 12px; }
-    .chart-empty span { max-width: 340px; font-size: 10px; line-height: 1.7; }
-    .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 9px 15px 11px; border-top: 1px solid #26322e; color: #a5b3ab; font-size: 9px; }
-    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
-    .legend-mark { width: 12px; height: 3px; border-radius: 1px; background: var(--green); }
-    .legend-mark.red { background: var(--red); }
-    .legend-mark.blue { background: var(--blue); }
-    .legend-mark.gold { background: var(--gold); }
-    .legend-mark.bid { height: 0; border-top: 1px dashed #46c896; background: transparent; }
-    .legend-mark.ask { height: 0; border-top: 1px dashed #efc36b; background: transparent; }
-    .right-stack { display: grid; gap: 13px; align-content: start; }
-    .positions-list { display: grid; gap: 8px; padding: 10px; }
-    .position-card { padding: 11px; border: 1px solid #e4eae5; border-radius: 6px; background: #fcfdfc; }
-    .position-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-    .position-side { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; }
-    .position-side.buy { color: #087d53; }
-    .position-side.sell { color: #c5504f; }
-    .ticket { color: #85918b; font-size: 9px; font-variant-numeric: tabular-nums; }
-    .position-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-    .level { min-width: 0; padding-top: 7px; border-top: 1px solid #e8ede9; }
-    .level-label { color: var(--muted); font-size: 8px; }
-    .level-value { margin-top: 4px; overflow: hidden; font-size: 10px; font-weight: 720; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-    .level-value.entry { color: #386ca5; }
-    .level-value.sl { color: #bf4e4c; }
-    .level-value.tp { color: #087d53; }
-    .position-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 9px; color: #79867f; font-size: 9px; }
-    .empty-state { padding: 21px 15px; color: var(--muted); text-align: center; font-size: 10px; line-height: 1.7; }
-    .empty-state strong { display: block; margin-bottom: 3px; color: #34413b; font-size: 11px; }
-    .empty-state.warning { margin: 9px; padding: 12px; border: 1px solid #eee3c8; border-radius: 6px; color: #7f6b44; background: #fcf8ed; text-align: left; }
-    .decision-card { padding: 13px 14px 14px; }
-    .decision-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .action { display: inline-flex; min-width: 73px; justify-content: center; padding: 6px 8px; border-radius: 4px; color: #68756e; background: #f0f3f0; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
-    .action-buy { color: #087d53; background: #e8f4ec; }
-    .action-sell { color: #c5504f; background: #fbebea; }
-    .action-exit { color: #376b9c; background: #e9f1f8; }
-    .decision-time { color: var(--muted); font-size: 9px; }
-    .decision-regime { margin-top: 10px; color: #31403a; font-size: 10px; font-weight: 700; }
-    .decision-reason { margin: 7px 0 0; color: #6e7b74; font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
-    .decision-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .meta-tag { padding: 4px 6px; border: 1px solid #e4eae5; border-radius: 4px; color: #66746d; font-size: 8px; }
-    .account-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin: 13px 0; }
-    .account-card { min-height: 72px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 7px; background: white; }
-    .account-label { color: var(--muted); font-size: 9px; }
-    .account-value { margin-top: 8px; font-size: 17px; font-weight: 740; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-    .account-note { margin-top: 3px; color: #8b9690; font-size: 8px; }
-    .lower-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); gap: 13px; align-items: start; }
-    .lower-stack { display: grid; gap: 13px; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; }
-    th { padding: 9px 11px; color: #77847d; background: #f8faf8; font-size: 8px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
-    td { max-width: 280px; padding: 10px 11px; border-top: 1px solid #edf1ed; vertical-align: middle; }
-    tbody tr:hover { background: #fbfcfb; }
-    .numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .muted { color: var(--muted); }
-    .reason { max-width: 320px; overflow: hidden; color: #67746e; text-overflow: ellipsis; white-space: nowrap; }
-    .positive { color: #087d53; }
-    .negative { color: #c5504f; }
-    .table-empty { padding: 24px 14px; color: var(--muted); text-align: center; line-height: 1.7; }
-    .notice { margin: 0; padding: 10px 13px; border-top: 1px solid #edf1ed; color: #77827c; background: #fafcfa; font-size: 9px; line-height: 1.65; }
-    .knowledge { padding: 5px 13px 12px; }
-    details { border-bottom: 1px solid #edf1ed; }
-    details:last-child { border-bottom: 0; }
-    summary { display: flex; min-height: 39px; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; font-size: 10px; font-weight: 700; }
-    summary::-webkit-details-marker { display: none; }
-    summary::after { color: #829087; content: "+"; font-size: 16px; font-weight: 400; }
-    details[open] summary::after { content: "−"; }
-    .knowledge-text { max-height: 230px; overflow: auto; margin: 0 0 12px; color: #68766f; font: 9px/1.7 "Cascadia Code", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .info-list { padding: 4px 13px 11px; }
-    .info-row { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #edf1ed; font-size: 9px; }
-    .info-row:last-child { border: 0; }
-    .info-row span { color: var(--muted); }
-    .info-row strong { text-align: right; font-weight: 680; }
-    .footer { padding: 17px 2px 0; color: #87938c; font-size: 9px; line-height: 1.7; }
-    .mobile-nav { display: none; }
-    @media(max-width: 1120px) {
-      .sidebar { width: 195px; }
-      main { margin-left: 195px; }
-      .content { padding-inline: 20px; }
-      .topbar { padding-inline: 20px; }
-      .hero-grid { grid-template-columns: minmax(0, 1.5fr) minmax(275px, .9fr); }
-      .chart-wrap { height: 320px; }
+    .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+    button { font: inherit; color: inherit; }
+
+    /* Navigation */
+    .nav {
+      position: sticky; top: 0; z-index: 20; background: var(--nav);
+      backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--line);
     }
-    @media(max-width: 820px) {
-      .sidebar { display: none; }
-      main { margin-left: 0; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
-      .topbar { height: 52px; padding-inline: 14px; }
-      .updated { display: none; }
-      .content { padding: 18px 13px 25px; }
-      .heading { align-items: flex-start; }
-      .heading-side { flex-direction: column; align-items: flex-end; }
-      .heading .subtitle { max-width: 290px; font-size: 10px; line-height: 1.6; }
-      .status-strip { grid-template-columns: 1fr; gap: 6px; }
-      .status-item { min-height: 41px; padding: 7px 10px; }
-      .quotes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .quote { min-height: 67px; padding: 10px 12px; }
-      .quote:nth-child(odd) { border-right: 1px solid #27332f; }
-      .quote:nth-child(-n+2) { border-bottom: 1px solid #27332f; }
-      .quote-value { margin-top: 6px; font-size: 20px; }
-      .hero-grid, .lower-grid { grid-template-columns: 1fr; gap: 10px; }
-      .right-stack, .lower-stack { gap: 10px; }
-      .chart-wrap { height: min(72vw, 340px); min-height: 255px; }
-      .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 10px 0; }
-      .account-card { min-height: 66px; padding: 9px 11px; }
-      .account-value { margin-top: 6px; font-size: 16px; }
-      .panel-head { min-height: 51px; padding: 10px 12px; }
-      .table-wrap { overflow: visible; }
-      .responsive-table, .responsive-table tbody { display: block; width: 100%; }
-      .responsive-table thead { display: none; }
-      .responsive-table tr { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; padding: 11px 12px; border-top: 1px solid #edf1ed; }
-      .responsive-table td { display: block; max-width: none; padding: 0; border: 0; }
-      .responsive-table td::before { display: block; margin-bottom: 3px; color: #87938d; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
-      .decision-table td:nth-child(1) { grid-column: 1; color: var(--muted); font-size: 8px; }
-      .decision-table td:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-      .decision-table td:nth-child(3), .decision-table td:nth-child(4) { grid-column: 1; }
-      .decision-table td:nth-child(5) { grid-column: 1 / -1; padding-top: 3px; white-space: normal; }
-      .trade-table tr { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 7px; }
-      .trade-table td:nth-child(1) { grid-column: 1 / -1; color: var(--muted); }
-      .trade-table td:nth-child(2)::before { content: "ฝั่ง"; }
-      .trade-table td:nth-child(3)::before { content: "ราคาเข้า"; }
-      .trade-table td:nth-child(4)::before { content: "ราคาออก"; }
-      .trade-table td:nth-child(5)::before { content: "กำไร/ขาดทุน"; }
-      .trade-table td:nth-child(6)::before { content: "ผล R"; }
-      .mobile-nav { position: fixed; inset: auto 0 0; z-index: 8; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid #dfe6e1; background: rgba(255,255,255,.97); backdrop-filter: blur(10px); }
-      .mobile-nav a { display: grid; justify-items: center; gap: 3px; padding: 3px; color: #77847d; font-size: 8px; }
-      .mobile-nav svg { width: 17px; height: 17px; }
-      .mobile-nav a.active, .mobile-nav a:hover { color: #087d53; }
+    .nav-inner { max-width: 1200px; margin: 0 auto; height: 56px; padding: 0 20px; display: flex; align-items: center; gap: 14px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -0.02em; white-space: nowrap; }
+    .brand-mark {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: linear-gradient(135deg, #f7d774 0%, #d4a017 55%, #9c6b00 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(180, 130, 0, 0.35);
     }
-    @media(max-width: 390px) {
-      .content { padding-inline: 9px; }
-      .topbar { padding-inline: 10px; }
-      .symbol-label { padding: 7px 8px; font-size: 10px; }
-      .pill { padding-inline: 6px; font-size: 8px; }
-      .heading-side { gap: 5px; }
-      .heading h1 { font-size: 22px; }
-      .chart-wrap { min-height: 235px; }
+    .nav-spacer { flex: 1; }
+    .live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); position: relative; flex: none; }
+    .dot.on { background: var(--green); }
+    .dot.on::after {
+      content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green);
+      opacity: 0; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
     }
-    @media(prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    .dot.warn { background: var(--orange); }
+    .dot.off { background: var(--red); }
+    @keyframes ping { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.6); opacity: 0; } }
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--gray-soft); cursor: pointer;
+      display: grid; place-items: center; transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .icon-btn:hover { transform: scale(1.06); }
+    .icon-btn svg { width: 17px; height: 17px; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 64px; }
+
+    /* Cards */
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 22px; min-width: 0;
+      transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease, background 0.4s ease;
+    }
+    .card.lift:hover { transform: translateY(-2px); }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 12px; letter-spacing: 0; }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .card-head .card-title { margin: 0; }
+    .sub { font-size: 13px; color: var(--muted); }
+
+    .reveal { opacity: 0; transform: translateY(14px); animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+
+    /* Hero */
+    .hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+    .eyebrow { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); font-weight: 500; }
+    .price { font-size: clamp(44px, 7vw, 68px); font-weight: 700; letter-spacing: -0.045em; line-height: 1.05; margin: 8px 0 6px; }
+    .change { font-size: 17px; font-weight: 600; }
+    .up { color: var(--green); } .down { color: var(--red); }
+    .quote-row { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .quote-row div { display: flex; flex-direction: column; gap: 2px; }
+    .quote-row span { font-size: 12px; color: var(--muted); }
+    .quote-row strong { font-size: 17px; font-weight: 600; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 600; white-space: nowrap; background: var(--gray-soft); color: var(--muted);
+    }
+    .pill.green { background: var(--green-soft); color: var(--green); }
+    .pill.red { background: var(--red-soft); color: var(--red); }
+    .pill.orange { background: var(--orange-soft); color: var(--orange); }
+    .pill.blue { background: var(--blue-soft); color: var(--blue); }
+
+    /* AI card */
+    .ai-card { display: flex; flex-direction: column; }
+    .ai-action { display: flex; align-items: center; gap: 16px; margin: 4px 0 14px; }
+    .ring { width: 64px; height: 64px; flex: none; position: relative; }
+    .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring circle { fill: none; stroke-width: 6; }
+    .ring .track { stroke: var(--gray-soft); }
+    .ring .meter { stroke: var(--blue); stroke-linecap: round; transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .ring span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; }
+    .action-word { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+    .reason { font-size: 14px; color: var(--text); line-height: 1.6; margin: 0; flex: 1; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+    /* Chart */
+    .chart-card { margin-bottom: 18px; padding: 22px 22px 14px; }
+    .chart-wrap { position: relative; height: 380px; margin: 0 -6px; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .tooltip {
+      position: absolute; pointer-events: none; background: var(--card-solid); border: 1px solid var(--line);
+      border-radius: 12px; padding: 8px 11px; font-size: 12px; box-shadow: var(--shadow); opacity: 0;
+      transition: opacity 0.15s ease; white-space: nowrap; z-index: 2;
+    }
+    .tooltip b { font-weight: 600; }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted); padding: 10px 2px 0; }
+    .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+    .tri-up { width: 0 !important; height: 0 !important; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--green); }
+    .tri-hollow { border: 1.5px solid var(--faint); border-radius: 2px; }
+    .empty-chart { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 14px; }
+    .empty-chart strong { display: block; color: var(--text); font-size: 17px; margin-bottom: 4px; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+    .stat-value { font-size: 30px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.15; }
+    .stat-foot { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+    .spark { height: 36px; margin-top: 10px; }
+
+    /* Two-column section */
+    .duo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+    .edge-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 92px; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+    .edge-row:first-of-type { border-top: 0; }
+    .edge-name { font-size: 14px; font-weight: 500; }
+    .edge-name small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+    .bar { height: 8px; border-radius: 99px; background: var(--gray-soft); position: relative; overflow: hidden; }
+    .bar::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--faint); opacity: 0.6; }
+    .bar i { position: absolute; top: 0; bottom: 0; border-radius: 99px; transition: all 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .edge-val { text-align: right; font-weight: 600; font-size: 15px; }
+    .verdict { margin-top: 14px; padding: 14px 16px; border-radius: 16px; background: var(--gray-soft); font-size: 13.5px; line-height: 1.6; }
+    .verdict strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+    .checklist { display: flex; flex-direction: column; }
+    .check { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+    .check:first-child { border-top: 0; padding-top: 2px; }
+    .check-body { flex: 1; min-width: 0; }
+    .check-body strong { display: block; font-size: 14px; font-weight: 500; }
+    .check-body span { display: block; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Positions */
+    .position { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+    .position:first-child { border-top: 0; }
+    .levels { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+    .levels b { color: var(--text); font-weight: 600; }
+
+    /* Segmented control + tables */
+    .segmented { position: relative; display: inline-flex; padding: 3px; border-radius: 11px; background: var(--gray-soft); margin-bottom: 16px; max-width: 100%; overflow-x: auto; }
+    .segmented button { position: relative; z-index: 1; border: 0; background: none; padding: 6px 16px; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; white-space: nowrap; color: var(--muted); transition: color 0.25s; }
+    .segmented button.active { color: var(--text); }
+    .seg-thumb { position: absolute; top: 3px; bottom: 3px; border-radius: 8px; background: var(--card-solid); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .tab { display: none; }
+    .tab.active { display: block; animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .table-wrap { overflow-x: auto; margin: 0 -4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th { text-align: left; font-weight: 500; font-size: 12px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: background 0.2s; }
+    tbody tr:hover { background: var(--gray-soft); }
+    td.reason-cell { color: var(--muted); min-width: 260px; max-width: 480px; }
+    .empty { padding: 30px 10px; text-align: center; color: var(--muted); font-size: 14px; }
+    details { border-top: 1px solid var(--line); padding: 12px 0; }
+    details:first-of-type { border-top: 0; }
+    summary { cursor: pointer; font-weight: 500; font-size: 14px; }
+    pre { white-space: pre-wrap; font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--muted); margin: 10px 0 0; }
+    .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 24px; margin-bottom: 14px; }
+    .kv div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+    .kv span { color: var(--muted); }
+    footer { text-align: center; color: var(--faint); font-size: 12px; margin-top: 32px; }
+
+    @media (max-width: 980px) {
+      .hero, .duo { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      main { padding: 18px 16px 48px; }
+      .nav-inner { padding: 0 16px; }
+      .live .live-text { display: none; }
+      .card { padding: 18px; border-radius: 20px; }
+      .stats { gap: 12px; }
+      .stat-value { font-size: 24px; }
+      .chart-wrap { height: 300px; }
+      .edge-row { grid-template-columns: 92px minmax(0, 1fr) 78px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar" aria-label="เมนูหลัก">
-      <a class="brand" href="#overview">
-        <span class="brand-mark">A</span>
-        <span><span class="brand-title">AURUM DESK</span><span class="brand-sub" style="display:block">XAUUSD · MT5 monitor</span></span>
-      </a>
-      <div class="nav-caption">ติดตามระบบ</div>
-      <nav class="nav">
-        <a class="active" href="#overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>ภาพรวมตลาด</a>
-        <a href="#positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5m0 14h17M7 15l4-5 3 2 5-7"/><path d="M16 3h4v4"/></svg>ออเดอร์ที่เปิด</a>
-        <a href="#decisions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2"/></svg>การตัดสินใจ</a>
-        <a href="#history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>ประวัติและบันทึก</a>
-      </nav>
-      <div class="side-note"><strong>แหล่งราคา: MT5 EA</strong>กราฟวาดจากแท่งที่ EA ส่งมาเท่านั้น ออเดอร์จะแสดงเมื่อ MT5 ยืนยันสถานะจริง</div>
-    </aside>
-
-    <main id="overview">
-      <header class="topbar">
-        <div class="crumb"><span>MT5</span><span aria-hidden="true">/</span><strong>หน้าควบคุม XAUUSD</strong></div>
-        <div class="top-right"><span class="updated" id="lastUpdated">กำลังอ่านข้อมูล…</span>
-          <button class="refresh" id="refreshButton" type="button">
-            <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.7-2L20 12M4 12l2.7 5a7 7 0 0 0 11.7-2"/></svg>รีเฟรช
-          </button>
-        </div>
-      </header>
-
-      <div class="content">
-        <section class="heading">
-          <div><p class="eyebrow">TRADING CONTROL ROOM</p><h1>โต๊ะติดตามการเทรด</h1><p class="subtitle">ดูราคาจาก MT5, สถานะ EA และเหตุผลของ AI ได้ในหน้าเดียว</p></div>
-          <div class="heading-side"><span class="symbol-label"><i class="symbol-dot"></i><span id="symbolName">XAUUSD</span><span class="muted" id="symbolTimeframe">· —</span></span><span class="pill neutral" id="freshnessPill">ยังรอข้อมูล</span></div>
-        </section>
-
-        <section class="status-strip" aria-label="สถานะการเชื่อมต่อ">
-          <article class="status-item"><div><div class="status-label">ข้อมูลจาก MT5</div><div class="status-value" id="feedStatus">ยังไม่มี snapshot</div></div><span class="pill warn" id="feedPill">รอ EA</span></article>
-          <article class="status-item"><div><div class="status-label">บริการตัดสินใจ</div><div class="status-value" id="bridgeStatus">กำลังตรวจสอบ…</div></div><span class="pill neutral" id="bridgePill">ตรวจสอบ</span></article>
-          <article class="status-item"><div><div class="status-label">โหมด EA จาก MT5</div><div class="status-value" id="modeStatus">กำลังตรวจสอบ…</div></div><span class="pill warn" id="modePill">รอข้อมูล EA</span></article>
-        </section>
-
-        <section class="quotes" aria-label="ราคาล่าสุดจาก MT5">
-          <article class="quote"><div class="quote-label">Bid · MT5</div><div class="quote-value bid" id="quoteBid">—</div></article>
-          <article class="quote"><div class="quote-label">Ask · MT5</div><div class="quote-value ask" id="quoteAsk">—</div></article>
-          <article class="quote"><div class="quote-label">Spread · points</div><div class="quote-value" id="quoteSpread">—</div></article>
-          <article class="quote"><div class="quote-label">เวลา server ของ MT5</div><div class="quote-value small" id="quoteTime">—</div></article>
-        </section>
-
-        <section class="hero-grid">
-          <article class="panel chart-panel" aria-labelledby="chartTitle">
-            <div class="panel-head"><div><h2 class="panel-title" id="chartTitle">กราฟราคาจริงจาก MT5</h2><p class="panel-description" id="chartDescription">รับแท่งปิดจาก EA · ไม่มีข้อมูลจำลอง</p></div><div class="chart-head-right"><span class="chart-badge" id="chartSource">รอ MT5</span><span class="chart-state" id="chartTime">—</span></div></div>
-            <div class="chart-wrap"><canvas id="priceChart" aria-label="กราฟแท่งเทียนราคาจาก MT5"></canvas><div class="chart-empty" id="chartEmpty"><strong>ยังไม่มีแท่งราคาจาก MT5</strong><span>เมื่อ EA ส่ง snapshot จริง กราฟและระดับราคาออเดอร์จะปรากฏตรงนี้ จะไม่สร้างข้อมูลตัวอย่างแทน</span></div></div>
-            <div class="chart-legend"><span class="legend-item"><i class="legend-mark"></i>แท่งปิดขึ้น</span><span class="legend-item"><i class="legend-mark red"></i>แท่งปิดลง / SL</span><span class="legend-item"><i class="legend-mark blue"></i>Entry</span><span class="legend-item"><i class="legend-mark gold"></i>TP</span><span class="legend-item"><i class="legend-mark bid"></i>Bid</span><span class="legend-item"><i class="legend-mark ask"></i>Ask</span></div>
-          </article>
-
-          <div class="right-stack">
-            <section class="panel" id="positions">
-              <div class="panel-head"><div><h2 class="panel-title">ออเดอร์ที่เปิดอยู่</h2><p class="panel-description">เฉพาะ position ของ EA ที่ MT5 ยืนยันแล้ว</p></div><span class="pill neutral" id="positionCount">—</span></div>
-              <div class="positions-list" id="positionsList"><div class="empty-state"><strong>รอข้อมูล position</strong>ยังยืนยันไม่ได้ว่ามีหรือไม่มีออเดอร์</div></div>
-              <p class="notice" id="positionSourceNote">ระดับราคา Entry, SL และ TP จะอ่านจาก position ที่เปิดจริงของ MT5 เท่านั้น</p>
-            </section>
-
-            <section class="panel" id="decisions">
-              <div class="panel-head"><div><h2 class="panel-title">AI คิดและตอบอะไรล่าสุด</h2><p class="panel-description">proposal จาก service; EA เป็นผู้ตรวจและส่งคำสั่ง</p></div></div>
-              <div class="decision-card" id="latestDecision"><div class="empty-state"><strong>ยังไม่มีการตัดสินใจ</strong>รอ MT5 ส่งแท่งปิดให้ service วิเคราะห์</div></div>
-            </section>
-          </div>
-        </section>
-
-        <section class="account-grid" aria-label="ตัวเลขบัญชีจาก MT5">
-          <article class="account-card"><div class="account-label">Balance จาก MT5</div><div class="account-value" id="accountBalance">—</div><div class="account-note">สกุลเงินตามบัญชีโบรกเกอร์</div></article>
-          <article class="account-card"><div class="account-label">Equity จาก MT5</div><div class="account-value" id="accountEquity">—</div><div class="account-note">ค่าจาก snapshot ล่าสุด</div></article>
-          <article class="account-card"><div class="account-label">บันทึกปิดใน bridge</div><div class="account-value" id="statTotal">—</div><div class="account-note">อาจไม่ครบเท่าประวัติ MT5</div></article>
-          <article class="account-card"><div class="account-label">ผลรวม P/L ใน bridge</div><div class="account-value" id="statPnlAccount">—</div><div class="account-note">หน่วยตามสกุลเงินบัญชีเมื่อมีข้อมูล</div></article>
-        </section>
-
-        <section class="lower-grid" id="history">
-          <div class="lower-stack">
-            <section class="panel">
-              <div class="panel-head"><div><h2 class="panel-title">การตัดสินใจที่ผ่านมา</h2><p class="panel-description">เหตุผลและสถานะที่ service บันทึกไว้</p></div><span class="pill neutral" id="decisionCount">0 รายการ</span></div>
-              <div class="table-wrap"><table class="responsive-table decision-table"><thead><tr><th>เวลาแท่ง</th><th>คำตอบ</th><th>สภาวะ</th><th>ความมั่นใจ</th><th>เหตุผล</th></tr></thead><tbody id="decisionsTable"><tr><td class="table-empty" colspan="5">ยังไม่มีข้อมูลจาก MT5</td></tr></tbody></table></div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><div><h2 class="panel-title">ประวัติรายการ</h2><p class="panel-description">รายการที่ bridge มีข้อมูลปิดอยู่</p></div><span class="pill neutral" id="tradeCount">0 รายการ</span></div>
-              <div class="table-wrap"><table class="responsive-table trade-table"><thead><tr><th>Ticket</th><th>ฝั่ง</th><th>ราคาเข้า</th><th>ราคาออก</th><th>P&amp;L</th><th>ผล R</th></tr></thead><tbody id="tradesTable"><tr><td class="table-empty" colspan="6">ยังไม่มีประวัติรายการ</td></tr></tbody></table></div>
-              <p class="notice">รายการปิดเป็นบันทึกของ bridge ไม่ใช่ประวัติทั้งหมดในบัญชี MT5; บางรายการอาจยังไม่มีข้อมูลเปิดครบ</p>
-            </section>
-          </div>
-          <div class="lower-stack">
-            <section class="panel" id="rules">
-              <div class="panel-head"><div><h2 class="panel-title">หลักคิดและบันทึกของระบบ</h2><p class="panel-description">ไฟล์ความรู้ที่ AI อ่านตอนวิเคราะห์</p></div></div>
-              <div class="knowledge">
-                <details open><summary>กฎการเทรด</summary><pre id="knowledgeRules" class="knowledge-text">กำลังโหลด…</pre></details>
-                <details><summary>แนวทางกลยุทธ์</summary><pre id="knowledgePrefs" class="knowledge-text">กำลังโหลด…</pre></details>
-                <details><summary>ข้อสังเกตตลาด</summary><pre id="knowledgeInsights" class="knowledge-text">กำลังโหลด…</pre></details>
-              </div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><div><h2 class="panel-title">สถานะบริการ</h2><p class="panel-description">สิ่งที่ API รายงานได้จริง</p></div></div>
-              <div class="info-list">
-                <div class="info-row"><span>Model ที่ตั้งค่า</span><strong id="aboutModel">—</strong></div>
-                <div class="info-row"><span>Gemini key</span><strong id="aboutKey">—</strong></div>
-                <div class="info-row"><span>Shadow flag (Cloud config)</span><strong id="aboutShadow">—</strong></div>
-                <div class="info-row"><span>ส่งคำสั่งจาก Cloud</span><strong>ไม่ส่ง</strong></div>
-                <div class="info-row"><span>อัปเดตหน้าเว็บ</span><strong>ทุก 10 วินาที</strong></div>
-              </div>
-              <p class="notice">Service ออนไลน์หรือมี API key ไม่ได้ยืนยันว่า AI ตอบสำเร็จทุกครั้ง ให้ดู Journal ของ MT5 และรายการตัดสินใจล่าสุดประกอบ</p>
-            </section>
-          </div>
-        </section>
-        <footer class="footer">Aurum Desk · กราฟและระดับออเดอร์วาดจากข้อมูลที่ EA ส่งจาก MT5 · ราคาที่เห็นเป็น snapshot ล่าสุด ไม่ใช่สตรีมทุก tick</footer>
-      </div>
-    </main>
-  </div>
-
-  <nav class="mobile-nav" aria-label="เมนูมือถือ">
-    <a class="active" href="#overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>ภาพรวม</a>
-    <a href="#positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5m0 14h17M7 15l4-5 3 2 5-7"/></svg>ออเดอร์</a>
-    <a href="#decisions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>AI</a>
-    <a href="#history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>ประวัติ</a>
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="brand"><span class="brand-mark"></span>Gold Desk</div>
+      <span class="pill" id="modePill">กำลังเชื่อมต่อ</span>
+      <div class="nav-spacer"></div>
+      <div class="live"><span class="dot" id="liveDot"></span><span class="live-text" id="liveText">กำลังเชื่อมต่อ…</span></div>
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="สลับธีม">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
   </nav>
 
+  <main>
+    <section class="hero">
+      <article class="card reveal" style="animation-delay: 0.02s">
+        <div class="eyebrow"><span id="symbolLabel">XAUUSD · M5</span><span class="pill" id="regimePill">—</span></div>
+        <div class="price num" id="price">—</div>
+        <div class="change num" id="change">รอข้อมูลจาก MT5</div>
+        <div class="quote-row">
+          <div><span>Bid</span><strong class="num" id="bid">—</strong></div>
+          <div><span>Ask</span><strong class="num" id="ask">—</strong></div>
+          <div><span>Spread</span><strong class="num" id="spread">—</strong></div>
+          <div><span>เวลา server</span><strong class="num" id="serverTime">—</strong></div>
+        </div>
+      </article>
+
+      <article class="card ai-card reveal" style="animation-delay: 0.08s">
+        <div class="card-head"><h2 class="card-title">AI ตัดสินใจล่าสุด</h2><span class="sub num" id="decisionTime">—</span></div>
+        <div class="ai-action">
+          <div class="ring" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><circle class="track" cx="32" cy="32" r="27"/><circle class="meter" id="ringMeter" cx="32" cy="32" r="27" stroke-dasharray="169.6" stroke-dashoffset="169.6"/></svg>
+            <span class="num" id="ringText">—</span>
+          </div>
+          <div>
+            <div class="action-word" id="actionWord">—</div>
+            <div class="sub" id="actionSub">ความมั่นใจของโมเดล (ไม่ใช่โอกาสชนะ)</div>
+          </div>
+        </div>
+        <p class="reason" id="reason">รอ EA ส่งแท่งปิดแรก</p>
+        <div class="meta-row" id="decisionMeta"></div>
+      </article>
+    </section>
+
+    <section class="card chart-card reveal" style="animation-delay: 0.14s">
+      <div class="card-head">
+        <div><h2 class="card-title">กราฟ M5 จาก MT5</h2><div class="sub" id="chartSub">แท่งที่ปิดแล้ว · เลื่อนเมาส์เพื่อดูราคา</div></div>
+        <span class="pill" id="positionPill">ไม่มีออเดอร์</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart" aria-label="กราฟแท่งเทียน XAUUSD"></canvas>
+        <div class="tooltip num" id="tooltip"></div>
+        <div class="empty-chart" id="chartEmpty"><div><strong>ยังไม่มีแท่งราคา</strong>เปิด EA บนกราฟ XAUUSD M5 แล้วข้อมูลจะขึ้นที่นี่</div></div>
+      </div>
+      <div class="legend">
+        <span><i class="tri-up"></i>AI อนุมัติ</span>
+        <span><i class="tri-hollow"></i>AI ปฏิเสธ</span>
+        <span><i style="background: var(--blue); height: 2px"></i>ราคาเข้า</span>
+        <span><i style="background: var(--red); height: 2px"></i>SL</span>
+        <span><i style="background: var(--green); height: 2px"></i>TP</span>
+      </div>
+    </section>
+
+    <section class="stats">
+      <article class="card lift reveal" style="animation-delay: 0.2s">
+        <h3 class="card-title">Equity</h3>
+        <div class="stat-value num" id="equity">—</div>
+        <canvas class="spark" id="spark"></canvas>
+      </article>
+      <article class="card lift reveal" style="animation-delay: 0.24s">
+        <h3 class="card-title">Balance</h3>
+        <div class="stat-value num" id="balance">—</div>
+        <div class="stat-foot" id="balanceFoot">—</div>
+      </article>
+      <article class="card lift reveal" style="animation-delay: 0.28s">
+        <h3 class="card-title">ผลเทรดจริง</h3>
+        <div class="stat-value num" id="netR">—</div>
+        <div class="stat-foot num" id="netFoot">ยังไม่มีไม้ที่ปิด</div>
+      </article>
+      <article class="card lift reveal" style="animation-delay: 0.32s">
+        <h3 class="card-title">Shadow ที่ AI อนุมัติ</h3>
+        <div class="stat-value num" id="shadowExp">—</div>
+        <div class="stat-foot num" id="shadowFoot">รอผล setup แรก</div>
+      </article>
+    </section>
+
+    <section class="duo">
+      <article class="card reveal" style="animation-delay: 0.36s">
+        <div class="card-head">
+          <div><h2 class="card-title">AI ช่วยให้ได้เปรียบจริงไหม?</h2><div class="sub">ผลเฉลี่ยต่อไม้ (R) ของ setup ที่ติดตามแบบ shadow</div></div>
+        </div>
+        <div id="edgeRows"></div>
+        <div class="verdict" id="verdict"></div>
+      </article>
+
+      <div style="display: grid; gap: 18px; align-content: start">
+        <article class="card reveal" style="animation-delay: 0.4s">
+          <h2 class="card-title">ความพร้อมของระบบ</h2>
+          <div class="checklist" id="checklist"></div>
+        </article>
+        <article class="card reveal" style="animation-delay: 0.44s">
+          <div class="card-head"><h2 class="card-title">ออเดอร์ที่เปิดอยู่</h2><span class="pill" id="positionCount">—</span></div>
+          <div id="positions"><div class="empty">ไม่มีออเดอร์</div></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="card reveal" style="animation-delay: 0.48s">
+      <div class="segmented" id="tabs">
+        <span class="seg-thumb" id="segThumb"></span>
+        <button type="button" class="active" data-tab="tabDecisions">การตัดสินใจ</button>
+        <button type="button" data-tab="tabTrades">ประวัติเทรด</button>
+        <button type="button" data-tab="tabSystem">ระบบ &amp; กฎ</button>
+      </div>
+      <div class="tab active" id="tabDecisions">
+        <div class="table-wrap"><table>
+          <thead><tr><th>แท่ง</th><th>คำตอบ</th><th>Setup</th><th>AI</th><th>ผล shadow</th><th>เหตุผล</th></tr></thead>
+          <tbody id="decisionRows"><tr><td colspan="6" class="empty">ยังไม่มีการตัดสินใจ</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="tab" id="tabTrades">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Position</th><th>ฝั่ง</th><th>เข้า</th><th>ออก</th><th>P&amp;L</th><th>R</th><th>Setup</th><th>เวลาปิด</th></tr></thead>
+          <tbody id="tradeRows"><tr><td colspan="8" class="empty">ยังไม่มีไม้ที่ปิด</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="tab" id="tabSystem">
+        <div class="kv" id="systemKv"></div>
+        <details><summary>กฎการเทรด</summary><pre id="kRules">กำลังโหลด…</pre></details>
+        <details><summary>แนวทางกลยุทธ์</summary><pre id="kPrefs">กำลังโหลด…</pre></details>
+        <details><summary>บทเรียนที่ AI บันทึก</summary><pre id="kInsights">กำลังโหลด…</pre></details>
+      </div>
+    </section>
+
+    <footer>ข้อมูลทั้งหมดมาจาก MT5 ผ่าน EA · ไม่มีข้อมูลจำลอง · ผลในอดีตไม่รับประกันอนาคต</footer>
+  </main>
+
   <script>
-    const byId = (id) => document.getElementById(id);
-    const hasNumber = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
-    const number = (value, digits = 2) => hasNumber(value) ? Number(value).toLocaleString('en-US', { minimumFractionDigits: Math.min(2, digits), maximumFractionDigits: digits }) : '—';
-    const amount = (value) => hasNumber(value) ? `${number(value, 2)}${latestMarket?.account_currency ? ` ${latestMarket.account_currency}` : ''}` : '—';
-    let latestMarket = null;
-    let loading = false;
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmt = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+    const signed = (v, d = 2, unit = '') => (typeof v === 'number' && isFinite(v)) ? `${v > 0 ? '+' : ''}${fmt(v, d)}${unit}` : '—';
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-    function setPill(id, label, kind = '') {
-      const node = byId(id);
-      node.className = `pill${kind ? ` ${kind}` : ''}`;
-      node.textContent = label;
+    let state = null;
+    let knowledgeLoaded = false;
+
+    // ---------- Theme ----------
+    function applyTheme(theme) {
+      if (theme) document.documentElement.setAttribute('data-theme', theme);
+      else document.documentElement.removeAttribute('data-theme');
+      if (state) { drawChart(); drawSpark(); }
     }
-    function localDate(value) {
-      if (!value) return null;
-      const normalized = String(value).replace(/\.(\d{2})\.(\d{2})\s/, '-$1-$2T');
-      const parsed = new Date(normalized);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-    function timeLabel(value) {
-      const date = localDate(value);
-      if (!date) return value || '—';
-      return new Intl.DateTimeFormat('th-TH', { dateStyle: 'short', timeStyle: 'short' }).format(date);
-    }
-    function rawTime(value) { return value || '—'; }
-    function setText(id, value) { byId(id).textContent = value == null ? '—' : String(value); }
-    function emptyRow(body, columns, message) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = columns;
-      cell.className = 'table-empty';
-      cell.textContent = message;
-      row.appendChild(cell);
-      body.replaceChildren(row);
-    }
-    function cell(row, value, className = '') {
-      const td = document.createElement('td');
-      td.textContent = value == null ? '—' : String(value);
-      if (className) td.className = className;
-      row.appendChild(td);
-      return td;
-    }
-    async function fetchJson(path) {
-      const response = await fetch(path, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
-      return response.json();
-    }
-    function ageMinutes(value) {
-      const date = value ? new Date(value) : null;
-      return !date || Number.isNaN(date.getTime()) ? Infinity : Math.max(0, (Date.now() - date.getTime()) / 60000);
+    try { applyTheme(localStorage.getItem('gd-theme')); } catch (e) {}
+    $('themeBtn').addEventListener('click', () => {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+      const next = dark ? 'light' : 'dark';
+      applyTheme(next);
+      try { localStorage.setItem('gd-theme', next); } catch (e) {}
+    });
+
+    // ---------- Number tween ----------
+    const tweens = {};
+    function tween(id, value, render) {
+      const el = $(id);
+      if (typeof value !== 'number' || !isFinite(value)) { el.textContent = render(value); tweens[id] = undefined; return; }
+      const from = tweens[id] ?? value;
+      tweens[id] = value;
+      if (from === value || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = render(value); return; }
+      const start = performance.now();
+      const step = (now) => {
+        const k = Math.min(1, (now - start) / 650);
+        const e = 1 - Math.pow(1 - k, 3);
+        el.textContent = render(from + (value - from) * e);
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
     }
 
-    function renderEaMode(market) {
-      const flags = ['ai_enabled', 'ai_shadow', 'legacy_signal_fallback'].every((key) => typeof market?.[key] === 'boolean');
-      if (!flags) {
-        setText('modeStatus', 'EA ยังไม่รายงานโหมด'); setPill('modePill', 'ยืนยันไม่ได้', 'warn'); return;
+    // ---------- Helpers ----------
+    function pill(id, text, kind) { const el = $(id); el.textContent = text; el.className = `pill ${kind || ''}`; }
+    function ageMin(iso) { if (!iso) return null; const t = Date.parse(iso); return isNaN(t) ? null : (Date.now() - t) / 60000; }
+    function utcToLocal(sqlTs) {
+      if (!sqlTs) return '—';
+      const d = new Date(sqlTs.replace(' ', 'T') + (sqlTs.endsWith('Z') ? '' : 'Z'));
+      return isNaN(d) ? sqlTs : d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    }
+    const ACTION_TH = { BUY: 'ซื้อ', SELL: 'ขาย', NO_TRADE: 'รอ', EXIT: 'ปิดไม้' };
+    const VERDICT = {
+      approved: ['อนุมัติ', 'green'], rejected: ['ปฏิเสธ', ''], unavailable: ['AI ไม่ตอบ', 'orange'],
+      blocked: ['ถูกกันไว้', 'orange'], no_candidate: ['ไม่มี setup', ''], position: ['ดูแลออเดอร์', 'blue'],
+    };
+    const REGIME_TH = {
+      trending_up: 'ขาขึ้น', trending_down: 'ขาลง', ranging: 'ไซด์เวย์', breakout: 'เบรกเอาต์',
+      high_volatility: 'ผันผวนสูง', pre_news: 'ใกล้ข่าวแรง', unclear: 'ไม่ชัด',
+    };
+    const OUTCOME = { win: ['ชนะ', 'green'], loss: ['แพ้', 'red'], timeout: ['หมดเวลา', ''], pending: ['รอผล', 'blue'], expired: ['ข้อมูลไม่พอ', ''] };
+
+    // ---------- Render ----------
+    function renderNav(o) {
+      const m = o.market || {};
+      const age = ageMin(m.market_received_at);
+      if (!o.health) { $('liveDot').className = 'dot off'; $('liveText').textContent = 'ติดต่อ service ไม่ได้'; }
+      else if (age == null) { $('liveDot').className = 'dot warn'; $('liveText').textContent = 'รอ EA ส่งข้อมูล'; }
+      else if (age < 7) { $('liveDot').className = 'dot on'; $('liveText').textContent = `สด · ${age < 1 ? 'เมื่อสักครู่' : Math.round(age) + ' นาทีก่อน'}`; }
+      else { $('liveDot').className = 'dot warn'; $('liveText').textContent = `ข้อมูลล่าสุด ${Math.round(age)} นาทีก่อน`; }
+
+      if (m.ai_shadow === true) pill('modePill', 'Shadow · ไม่ส่งออเดอร์', 'blue');
+      else if (m.ai_enabled === true) pill('modePill', 'Live · ส่งออเดอร์จริง', 'red');
+      else if (m.available) pill('modePill', 'AI ปิดอยู่', '');
+      else pill('modePill', 'รอ EA', '');
+    }
+
+    function renderHero(o) {
+      const m = o.market || {};
+      const candles = m.candles || [];
+      $('symbolLabel').textContent = `${m.symbol || 'XAUUSD'} · ${m.timeframe || 'M5'}`;
+      tween('price', m.bid, (v) => fmt(v, 2));
+      $('bid').textContent = fmt(m.bid, 2);
+      $('ask').textContent = fmt(m.ask, 2);
+      $('spread').textContent = m.spread_points != null ? `${m.spread_points} pts` : '—';
+      $('serverTime').textContent = m.server_time || '—';
+      const first = candles.length ? candles[candles.length - 1].o : null;
+      if (first && typeof m.bid === 'number') {
+        const diff = m.bid - first, pct = diff / first * 100;
+        $('change').textContent = `${signed(diff)} (${signed(pct, 2, '%')}) ใน ${candles.length} แท่งล่าสุด`;
+        $('change').className = `change num ${diff >= 0 ? 'up' : 'down'}`;
+      } else { $('change').textContent = 'รอข้อมูลจาก MT5'; $('change').className = 'change'; }
+      const regime = o.context?.regime;
+      pill('regimePill', regime ? (REGIME_TH[regime] || regime) : '—', regime === 'trending_up' ? 'green' : regime === 'trending_down' ? 'red' : '');
+    }
+
+    function renderDecision(o) {
+      const d = (o.decisions || [])[0];
+      if (!d) return;
+      const action = d.action || 'NO_TRADE';
+      const word = $('actionWord');
+      word.textContent = ACTION_TH[action] || action;
+      word.className = `action-word ${action === 'BUY' ? 'up' : action === 'SELL' ? 'down' : ''}`;
+      const conf = Math.max(0, Math.min(1, d.confidence || 0));
+      $('ringMeter').style.strokeDashoffset = String(169.6 * (1 - conf));
+      $('ringMeter').style.stroke = action === 'BUY' ? css('--green') : action === 'SELL' ? css('--red') : css('--blue');
+      $('ringText').textContent = conf ? Math.round(conf * 100) : '—';
+      $('reason').textContent = (d.reason || '').replace(/^\[SHADOW MODE\]\s*/, '') || '—';
+      $('decisionTime').textContent = `แท่ง ${d.bar_time || '—'}`;
+      const [vText, vKind] = VERDICT[d.ai_verdict] || ['—', ''];
+      const meta = d.ai_verdict ? [`<span class="pill ${vKind}">${esc(vText)}</span>`] : [];
+      if (d.regime) meta.push(`<span class="pill">${esc(REGIME_TH[d.regime] || d.regime)}</span>`);
+      if (action === 'BUY' || action === 'SELL') meta.push(`<span class="pill">SL ${fmt(d.stop_atr, 1)} ATR · TP ${fmt(d.target_r, 1)}R</span>`);
+      if (d.llm_model) meta.push(`<span class="pill">${esc(d.llm_model)}</span>`);
+      $('decisionMeta').innerHTML = meta.join('');
+    }
+
+    function renderStats(o) {
+      const m = o.market || {};
+      const cur = m.account_currency || 'USD';
+      tween('equity', m.equity, (v) => fmt(v, 2));
+      tween('balance', m.balance, (v) => fmt(v, 2));
+      const floating = typeof m.equity === 'number' && typeof m.balance === 'number' ? m.equity - m.balance : null;
+      $('balanceFoot').textContent = floating != null ? `${cur} · ลอยอยู่ ${signed(floating)}` : cur;
+
+      const p = o.performance || {};
+      if (p.total_trades) {
+        tween('netR', p.net_pnl_r, (v) => signed(v, 2, 'R'));
+        $('netR').className = `stat-value num ${p.net_pnl_r >= 0 ? 'up' : 'down'}`;
+        $('netFoot').textContent = `${p.total_trades} ไม้ · ชนะ ${fmt(p.win_rate, 0)}% · ${signed(p.net_pnl_usd)} ${cur}`;
       }
-      const permissionBlocked = market.ai_enabled && (market.terminal_trade_allowed === false || market.ea_trade_allowed === false);
-      const permissionUnknown = market.ai_enabled && (market.terminal_trade_allowed !== true || market.ea_trade_allowed !== true);
-      let status, kind;
-      if (market.ai_enabled && market.ai_shadow) {
-        status = 'ค่า AI Trade กับ Shadow ขัดกัน'; kind = 'down';
-      } else if (market.terminal_connected === false) {
-        status = 'MT5 ระบุว่าไม่เชื่อมต่อ'; kind = 'down';
-      } else if (permissionBlocked) {
-        status = 'MT5 ปิดสิทธิ์ส่งคำสั่ง'; kind = 'warn';
-      } else if (market.ai_shadow) {
-        status = 'Shadow · วิเคราะห์แต่ไม่ส่งออเดอร์'; kind = 'warn';
-      } else if (permissionUnknown) {
-        status = 'EA เปิดโหมดเทรด แต่ยืนยันสิทธิ์ไม่ได้'; kind = 'warn';
-      } else if (market.ai_enabled) {
-        status = 'AI trade เปิด · ยังผ่าน guardrails ก่อน'; kind = '';
-      } else if (market.legacy_signal_fallback) {
-        status = 'เปิดใช้สัญญาณกฎเดิม'; kind = 'warn';
+      const a = o.shadow?.approved;
+      if (a && a.n) {
+        tween('shadowExp', a.expectancy_r, (v) => signed(v, 2, 'R'));
+        $('shadowExp').className = `stat-value num ${a.expectancy_r >= 0 ? 'up' : 'down'}`;
+        $('shadowFoot').textContent = `เฉลี่ยต่อไม้ · ${a.n} setup · ชนะ ${fmt(a.win_rate, 0)}%${a.pending ? ` · รอ ${a.pending}` : ''}`;
+      } else if (a && a.pending) {
+        $('shadowFoot').textContent = `รอผล ${a.pending} setup`;
+      }
+    }
+
+    function renderEdge(o) {
+      const s = o.shadow || {};
+      const bt = o.backtest?.net?.all;
+      const rows = [
+        ['ทุก setup', 'ไม่กรองเลย', s.all],
+        ['AI อนุมัติ', 'ที่จะเข้าเทรด', s.approved],
+        ['AI ปฏิเสธ', 'ที่ AI ข้าม', s.rejected],
+      ];
+      if (bt) rows.push(['Backtest', `${bt.n.toLocaleString()} ไม้ย้อนหลัง`, { n: bt.n, expectancy_r: bt.expectancy_r, win_rate: bt.win_rate, quiet: true }]);
+      const scale = 0.5;  // the bar spans -0.5R .. +0.5R
+      $('edgeRows').innerHTML = rows.map(([name, note, g]) => {
+        const exp = g && g.n ? g.expectancy_r : null;
+        let bar = '';
+        if (exp != null) {
+          const w = Math.min(50, Math.abs(exp) / scale * 50);
+          const color = exp >= 0 ? 'var(--green)' : 'var(--red)';
+          bar = `<i style="background:${color};${exp >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%"></i>`;
+        }
+        const n = g ? (g.n || 0) : 0;
+        return `<div class="edge-row"><div class="edge-name">${esc(name)}<small>${esc(note)}${n && !g.quiet ? ` · n=${n}` : ''}</small></div>
+          <div class="bar">${bar}</div>
+          <div class="edge-val num ${exp == null ? '' : exp >= 0 ? 'up' : 'down'}">${exp == null ? '—' : signed(exp, 3, 'R')}</div></div>`;
+      }).join('');
+
+      const ap = s.approved || {}, rj = s.rejected || {};
+      let title, body;
+      if ((ap.n || 0) < 30 || (rj.n || 0) < 30) {
+        title = 'ยังสรุปไม่ได้';
+        body = `ต้องมี setup ที่ปิดผลแล้วอย่างน้อย 30 ไม้ทั้งฝั่งอนุมัติและปฏิเสธ (ตอนนี้ ${ap.n || 0} / ${rj.n || 0}). `;
+        if (bt) body += `Backtest ของ setup พื้นฐานคือ ${signed(bt.expectancy_r, 3, 'R')} ต่อไม้ (PF ${fmt(o.backtest.net.all.profit_factor, 2)}) — AI ต้องคัดให้ดีกว่านี้จึงจะคุ้ม`;
+      } else if (ap.expectancy_r > 0.05 && ap.expectancy_r > (rj.expectancy_r ?? 0)) {
+        title = 'AI ดูมีประโยชน์ — แต่ยังต้องดูต่อ';
+        body = 'ไม้ที่ AI อนุมัติทำได้ดีกว่าไม้ที่ปฏิเสธและเป็นบวก ทดสอบบน demo ต่ออย่างน้อยหลายสัปดาห์ก่อนพิจารณาเงินจริง';
       } else {
-        status = 'ปิดการส่งออเดอร์ใหม่'; kind = 'neutral';
+        title = 'AI ยังไม่ได้เพิ่มความได้เปรียบ';
+        body = 'ไม้ที่ AI อนุมัติยังไม่ดีกว่าไม้ที่ปฏิเสธอย่างชัดเจน อย่าเปิดเทรดจริง ควรปรับกฎ setup หรือ prompt ก่อน';
       }
-      setText('modeStatus', status);
-      setPill('modePill', kind === 'down' ? 'ตรวจสิทธิ์' : (kind === 'warn' ? 'ดูอย่างเดียว/ตรวจค่า' : (market.ai_enabled ? 'EA อนุญาต' : 'ไม่ส่งออเดอร์')), kind);
+      $('verdict').innerHTML = `<strong>${esc(title)}</strong>${esc(body)}`;
     }
 
-    function drawChart(market) {
-      const canvas = byId('priceChart');
-      const empty = byId('chartEmpty');
+    function renderChecklist(o) {
+      const m = o.market || {}, h = o.health || {};
+      const age = ageMin(m.market_received_at);
+      const algo = m.terminal_trade_allowed == null ? null : m.terminal_trade_allowed && m.ea_trade_allowed !== false;
+      const items = [
+        ['Cloud service', h.status === 'online', h.status === 'online' ? `${h.model} · สำรอง ${h.fallback_model}` : 'ไม่ตอบสนอง'],
+        ['Gemini API key', h.gemini_api_configured, h.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ใส่ GEMINI_API_KEY ใน .env'],
+        ['ข้อมูลจาก EA', age != null && age < 7, age == null ? 'ยังไม่เคยได้รับ snapshot' : `ล่าสุด ${Math.round(age)} นาทีก่อน`],
+        ['MT5 เชื่อมต่อโบรกเกอร์', m.terminal_connected, m.terminal_connected == null ? 'รอข้อมูล' : m.terminal_connected ? 'เชื่อมต่อแล้ว' : 'ขาดการเชื่อมต่อ'],
+        ['Algo Trading ใน MT5', algo, algo == null ? 'รอข้อมูล' : algo ? 'อนุญาต' : 'ปิดอยู่ — กดปุ่ม Algo Trading ใน MT5'],
+        ['Shadow mode', m.ai_shadow, m.ai_shadow == null ? 'รอข้อมูล' : m.ai_shadow ? 'ปลอดภัย: บันทึกอย่างเดียว' : 'ปิดแล้ว: EA ส่งออเดอร์ได้'],
+      ];
+      $('checklist').innerHTML = items.map(([name, ok, note]) => {
+        const kind = ok === true ? 'on' : ok == null ? '' : (name === 'Shadow mode' ? 'warn' : 'off');
+        return `<div class="check"><span class="dot ${kind === 'on' ? '' : kind}" style="${kind === 'on' ? 'background:var(--green)' : ''}"></span>
+          <div class="check-body"><strong>${esc(name)}</strong><span>${esc(note)}</span></div></div>`;
+      }).join('');
+    }
+
+    function renderPositions(o) {
+      const list = o.market?.open_positions;
+      const box = $('positions');
+      if (!Array.isArray(list)) { pill('positionCount', 'รอข้อมูล', ''); pill('positionPill', 'ไม่มีข้อมูลออเดอร์', ''); return; }
+      pill('positionCount', `${list.length} ไม้`, list.length ? 'blue' : '');
+      if (!list.length) { box.innerHTML = '<div class="empty">ไม่มีออเดอร์</div>'; pill('positionPill', 'ไม่มีออเดอร์', ''); return; }
+      const p0 = list[0];
+      pill('positionPill', `${p0.direction} ${fmt(p0.volume, 2)} · ${signed(p0.profit)}`, p0.profit >= 0 ? 'green' : 'red');
+      box.innerHTML = list.map((p) => `<div class="position">
+          <span class="pill ${p.direction === 'BUY' ? 'green' : 'red'}">${esc(p.direction)}</span>
+          <div class="levels num"><span>เข้า <b>${fmt(p.entry_price)}</b></span><span>SL <b>${fmt(p.sl_price)}</b></span><span>TP <b>${fmt(p.tp_price)}</b></span><span>${fmt(p.volume, 2)} lot</span></div>
+          <strong class="num ${p.profit >= 0 ? 'up' : 'down'}">${signed(p.profit)}</strong></div>`).join('');
+    }
+
+    function renderTables(o) {
+      const ds = o.decisions || [];
+      $('decisionRows').innerHTML = ds.length ? ds.map((d) => {
+        const [vText, vKind] = VERDICT[d.ai_verdict] || [d.ai_verdict || '—', ''];
+        const [oText, oKind] = OUTCOME[d.outcome] || ['—', ''];
+        const r = d.outcome_r != null && d.outcome !== 'pending' ? ` ${signed(d.outcome_r, 2, 'R')}` : '';
+        const act = d.action === 'BUY' ? 'up' : d.action === 'SELL' ? 'down' : '';
+        return `<tr><td class="num">${esc(d.bar_time)}</td><td class="${act}"><b>${esc(ACTION_TH[d.action] || d.action)}</b></td>
+          <td>${esc(d.candidate_side ? `${d.candidate_side} ${d.candidate_setup || ''}` : '—')}</td>
+          <td>${d.ai_verdict ? `<span class="pill ${vKind}">${esc(vText)}</span>` : '—'}</td>
+          <td>${d.outcome ? `<span class="pill ${oKind}">${esc(oText)}${esc(r)}</span>` : '—'}</td>
+          <td class="reason-cell">${esc((d.reason || '').replace(/^\[SHADOW MODE\]\s*/, ''))}</td></tr>`;
+      }).join('') : '<tr><td colspan="6" class="empty">ยังไม่มีการตัดสินใจ</td></tr>';
+
+      const ts = (o.trades || []).filter((t) => t.status === 'closed');
+      $('tradeRows').innerHTML = ts.length ? ts.map((t) => `<tr>
+          <td class="num">${esc(t.ticket)}</td><td class="${t.direction === 'BUY' ? 'up' : 'down'}"><b>${esc(t.direction)}</b></td>
+          <td class="num">${fmt(t.entry_price)}</td><td class="num">${fmt(t.close_price)}</td>
+          <td class="num ${t.pnl_usd >= 0 ? 'up' : 'down'}">${signed(t.pnl_usd)}</td>
+          <td class="num">${t.pnl_r == null ? '—' : signed(t.pnl_r, 2, 'R')}</td>
+          <td>${esc(t.setup || '—')}</td><td class="num">${esc(t.close_time || '—')}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="empty">ยังไม่มีไม้ที่ปิด</td></tr>';
+
+      const h = o.health || {}, bt = o.backtest;
+      const kv = [
+        ['โมเดลหลัก', h.model], ['โมเดลสำรอง', h.fallback_model],
+        ['Shadow (cloud)', h.shadow_mode ? 'เปิด' : 'ปิด'], ['Decision ทั้งหมดที่แสดง', `${ds.length}`],
+      ];
+      if (bt) kv.push(['Backtest ช่วงข้อมูล', `${bt.start.slice(0, 10)} → ${bt.end.slice(0, 10)}`], ['Backtest PF / Exp', `${fmt(bt.net.all.profit_factor)} / ${signed(bt.net.all.expectancy_r, 3, 'R')}`]);
+      $('systemKv').innerHTML = kv.map(([k, v]) => `<div><span>${esc(k)}</span><strong>${esc(v ?? '—')}</strong></div>`).join('');
+    }
+
+    // ---------- Chart ----------
+    const chart = { canvas: $('chart'), hover: null, layout: null };
+    function setupCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      const width = rect.width;
-      const height = rect.height;
-      if (!width || !height) return;
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
       const ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, width, height);
+      return { ctx, w: rect.width, h: rect.height };
+    }
 
-      const valid = Array.isArray(market?.candles) ? market.candles.filter((c) =>
-        ['o', 'h', 'l', 'c'].every((key) => Number.isFinite(Number(c[key])) && Number(c[key]) > 0) &&
-        Number(c.h) >= Math.max(Number(c.o), Number(c.c)) && Number(c.l) <= Math.min(Number(c.o), Number(c.c))
-      ) : [];
-      if (!market?.available || !valid.length) {
-        empty.hidden = false;
-        byId('chartSource').textContent = 'รอ MT5';
-        byId('chartTime').textContent = '—';
-        byId('chartDescription').textContent = 'ยังไม่ได้รับแท่งราคาจริงจาก EA';
-        return;
-      }
-      empty.hidden = true;
-      const candles = valid.some((c) => Number.isFinite(Number(c.t)))
-        ? valid.slice().sort((a, b) => Number(a.t || 0) - Number(b.t || 0))
-        : valid.slice().reverse();
-      const positionsKnown = market.positions_available === true && Array.isArray(market.open_positions);
-      const positions = positionsKnown ? market.open_positions : [];
-      const levelRows = [];
-      for (const pos of positions) {
-        for (const [key, label, color, dash] of [['entry_price', 'ENTRY', '#65a8ee', []], ['sl_price', 'SL', '#df6261', [5, 4]], ['tp_price', 'TP', '#d7ad5d', [5, 4]]]) {
-          const price = Number(pos[key]);
-          if (Number.isFinite(price) && price > 0) levelRows.push({ price, label, color, dash, ticket: pos.ticket });
-        }
-      }
-      const quoteRows = [];
-      if (hasNumber(market.bid) && Number(market.bid) > 0) quoteRows.push({ price: Number(market.bid), color: '#46c896' });
-      if (hasNumber(market.ask) && Number(market.ask) > 0) quoteRows.push({ price: Number(market.ask), color: '#efc36b' });
-      const all = candles.flatMap((c) => [Number(c.h), Number(c.l)]).concat(levelRows.map((v) => v.price), quoteRows.map((v) => v.price));
-      let min = Math.min(...all), max = Math.max(...all);
-      if (!Number.isFinite(min) || !Number.isFinite(max)) return;
-      if (max === min) { max += Math.abs(max * .0005); min -= Math.abs(min * .0005); }
-      const pad = (max - min) * .07;
-      min -= pad; max += pad;
-      const left = 12, right = width - 69, top = 16, bottom = height - 34;
-      const plotW = Math.max(24, right - left), plotH = Math.max(50, bottom - top);
-      const y = (price) => bottom - ((price - min) / (max - min)) * plotH;
-      const priceText = (value) => Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 });
+    function drawChart() {
+      const m = state?.market || {};
+      const candles = (m.candles || []).slice().reverse();
+      $('chartEmpty').style.display = candles.length ? 'none' : 'grid';
+      const { ctx, w, h } = setupCanvas(chart.canvas);
+      ctx.clearRect(0, 0, w, h);
+      if (!candles.length) { chart.layout = null; return; }
 
-      ctx.font = '9px Segoe UI, sans-serif';
+      const positions = Array.isArray(m.open_positions) ? m.open_positions : [];
+      const levels = positions.flatMap((p) => [p.entry_price, p.sl_price, p.tp_price]).filter((v) => v > 0);
+      let lo = Math.min(...candles.map((c) => c.l)), hi = Math.max(...candles.map((c) => c.h));
+      const span0 = hi - lo || 1;
+      levels.forEach((v) => { if (v > lo - span0 && v < hi + span0) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+      const pad = (hi - lo) * 0.08 || 1;
+      lo -= pad; hi += pad;
+
+      const left = 6, right = 64, top = 10, bottom = 26;
+      const pw = w - left - right, ph = h - top - bottom;
+      const step = pw / candles.length;
+      const y = (v) => top + (hi - v) / (hi - lo) * ph;
+      const xc = (i) => left + step * i + step / 2;
+      chart.layout = { candles, step, left, top, ph, pw, y, xc, lo, hi, w, h };
+
+      ctx.font = '11px Inter, "Noto Sans Thai", sans-serif';
       ctx.textBaseline = 'middle';
-      for (let i = 0; i <= 4; i++) {
-        const gy = top + plotH * i / 4;
-        const value = max - (max - min) * i / 4;
-        ctx.beginPath(); ctx.moveTo(left, gy); ctx.lineTo(right, gy);
-        ctx.strokeStyle = '#26332f'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = '#9caaa2'; ctx.fillText(priceText(value), right + 7, gy);
+      const grid = css('--chart-grid'), muted = css('--muted');
+      for (let k = 0; k <= 4; k++) {
+        const v = lo + (hi - lo) * k / 4, yy = Math.round(y(v)) + 0.5;
+        ctx.strokeStyle = grid; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(w - right, yy); ctx.stroke();
+        ctx.fillStyle = muted; ctx.textAlign = 'left';
+        ctx.fillText(fmt(v, 2), w - right + 8, yy);
       }
-      for (let i = 0; i <= 4; i++) {
-        const gx = left + plotW * i / 4;
-        ctx.beginPath(); ctx.moveTo(gx, top); ctx.lineTo(gx, bottom);
-        ctx.strokeStyle = '#1d2925'; ctx.lineWidth = 1; ctx.stroke();
-      }
-
-      const slot = plotW / candles.length;
-      const bodyW = Math.max(2, Math.min(10, slot * .58));
-      for (let i = 0; i < candles.length; i++) {
-        const c = candles[i];
-        const open = Number(c.o), close = Number(c.c);
-        const high = Number(c.h), low = Number(c.l);
-        const cx = left + slot * (i + .5);
-        const color = close >= open ? '#27bf7e' : '#e36863';
-        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(cx, y(high)); ctx.lineTo(cx, y(low)); ctx.stroke();
-        const bodyTop = Math.min(y(open), y(close));
-        const bodyHeight = Math.max(1, Math.abs(y(close) - y(open)));
-        ctx.fillRect(cx - bodyW / 2, bodyTop, bodyW, bodyHeight);
-      }
-
-      for (const quote of quoteRows) {
-        ctx.save(); ctx.beginPath(); ctx.setLineDash([2, 4]); ctx.strokeStyle = quote.color; ctx.lineWidth = 1;
-        ctx.moveTo(left, y(quote.price)); ctx.lineTo(right, y(quote.price)); ctx.stroke(); ctx.restore();
-      }
-
-      for (const level of levelRows) {
-        const yy = y(level.price);
-        ctx.save(); ctx.beginPath(); ctx.setLineDash(level.dash); ctx.strokeStyle = level.color; ctx.lineWidth = level.label === 'ENTRY' ? 1.4 : 1;
-        ctx.moveTo(left, yy); ctx.lineTo(right, yy); ctx.stroke(); ctx.restore();
-        const tag = `${level.label} #${level.ticket}`;
-        ctx.font = '8px Segoe UI, sans-serif';
-        const tagWidth = Math.min(90, ctx.measureText(tag).width + 8);
-        ctx.fillStyle = '#111a19'; ctx.fillRect(left + 4, yy - 8, tagWidth, 15);
-        ctx.fillStyle = level.color; ctx.textBaseline = 'middle'; ctx.fillText(tag, left + 8, yy);
-      }
-
-      ctx.fillStyle = '#a8b5ae'; ctx.font = '8px Segoe UI, sans-serif'; ctx.textBaseline = 'alphabetic';
-      const first = candles[0], last = candles[candles.length - 1];
-      if (candles.every((c) => typeof c.label === 'string' && c.label.length > 0)) {
-        for (let i = 0; i <= 4; i++) {
-          const index = Math.min(candles.length - 1, Math.round((candles.length - 1) * i / 4));
-          const label = candles[index].label.slice(-5); // Broker/server clock, not browser-local time.
-          const x = left + plotW * i / 4;
-          ctx.textAlign = i === 0 ? 'left' : (i === 4 ? 'right' : 'center');
-          ctx.fillText(label, x, height - 8);
-        }
-      } else {
-        ctx.textAlign = 'left'; ctx.fillText('แท่งปิดจริงจาก MT5', left, height - 8);
-        ctx.textAlign = 'right'; ctx.fillText(`${candles.length} แท่ง · เรียงเก่าไปใหม่`, right, height - 8);
-      }
-      ctx.textAlign = 'left';
-      byId('chartSource').textContent = market.chart_source === 'chart_candles_m5'
-        ? `MT5 จริง · ${candles.length} แท่ง`
-        : `MT5 จริง · ${candles.length} แท่งรุ่นเดิม`;
-      byId('chartTime').textContent = `แท่งล่าสุด ${rawTime(market.bar_time)}`;
-      byId('chartDescription').textContent = `${market.symbol || 'XAUUSD'} · ${market.timeframe || 'M5'} · ราคาปิดของแท่งที่ MT5 ส่งมา`;
-    }
-
-    function renderPositions(market) {
-      const list = byId('positionsList');
-      if (!market || !market.positions_available || !Array.isArray(market.open_positions)) {
-        setText('positionCount', 'ยังไม่ยืนยัน');
-        const wrap = document.createElement('div'); wrap.className = 'empty-state warning';
-        const strong = document.createElement('strong'); strong.textContent = 'EA ยังไม่ได้รายงานระดับออเดอร์';
-        wrap.append(strong, document.createTextNode('เปิด MetaEditor แล้ว compile เวอร์ชัน EA ล่าสุด จากนั้นรอ sync จาก MT5 เพื่อแสดง Entry, SL และ TP จริง'));
-        list.replaceChildren(wrap);
-        setText('positionSourceNote', 'ไม่ใช้ค่าคาดการณ์แทนราคา broker; สถานะปัจจุบันยังยืนยันไม่ได้');
-        return;
-      }
-      const positions = market.open_positions;
-      setText('positionCount', `${positions.length} เปิดอยู่`);
-      if (!positions.length) {
-        const empty = document.createElement('div'); empty.className = 'empty-state';
-        const strong = document.createElement('strong'); strong.textContent = 'MT5 รายงานว่าไม่มี position ของ EA ที่เปิดอยู่';
-        empty.append(strong, document.createTextNode(`ข้อมูล position รับล่าสุด ${rawTime(market.positions_server_time || market.server_time)}`));
-        list.replaceChildren(empty);
-      } else {
-        const cards = positions.slice(0, 20).map((pos) => {
-          const card = document.createElement('article'); card.className = 'position-card';
-          const top = document.createElement('div'); top.className = 'position-top';
-          const side = document.createElement('div'); side.className = `position-side ${String(pos.direction).toLowerCase()}`;
-          side.textContent = `${pos.direction} · ${number(pos.volume, 8)} lot`;
-          const ticket = document.createElement('span'); ticket.className = 'ticket'; ticket.textContent = `Ticket #${pos.ticket}`;
-          top.append(side, ticket);
-          const levels = document.createElement('div'); levels.className = 'position-levels';
-          for (const [label, key, kind] of [['Entry', 'entry_price', 'entry'], ['SL', 'sl_price', 'sl'], ['TP', 'tp_price', 'tp']]) {
-            const item = document.createElement('div'); item.className = 'level';
-            const title = document.createElement('div'); title.className = 'level-label'; title.textContent = label;
-            const value = document.createElement('div'); value.className = `level-value ${kind}`;
-            const price = Number(pos[key]); value.textContent = price > 0 ? number(price, 5) : 'ไม่มีระดับ';
-            item.append(title, value); levels.appendChild(item);
-          }
-          const foot = document.createElement('div'); foot.className = 'position-foot';
-          const pnl = Number(pos.profit);
-          const pnlText = document.createElement('span'); pnlText.className = pnl > 0 ? 'positive' : (pnl < 0 ? 'negative' : ''); pnlText.textContent = `P/L + swap ${amount(pos.profit)}`;
-          const opened = document.createElement('span'); opened.textContent = `เปิด ${rawTime(pos.open_time)}`;
-          foot.append(pnlText, opened);
-          card.append(top, levels, foot);
-          return card;
-        });
-        list.replaceChildren(...cards);
-      }
-      const posAge = ageMinutes(market.positions_received_at);
-      setText('positionSourceNote', Number.isFinite(posAge)
-        ? `ข้อมูล position รับจาก EA ${Math.floor(posAge)} นาทีที่แล้ว · Entry/SL/TP เป็นค่าจาก MT5`
-        : 'Entry/SL/TP เป็นค่าจาก position ที่ MT5 ส่งมา');
-    }
-
-    function renderLatestDecision(decision) {
-      const root = byId('latestDecision');
-      if (!decision) {
-        const empty = document.createElement('div'); empty.className = 'empty-state';
-        const strong = document.createElement('strong'); strong.textContent = 'ยังไม่มีการตัดสินใจ';
-        empty.append(strong, document.createTextNode('รอ MT5 ส่งแท่งปิดให้ service วิเคราะห์'));
-        root.replaceChildren(empty); return;
-      }
-      const actionText = String(decision.action || 'NO_TRADE').toUpperCase();
-      const top = document.createElement('div'); top.className = 'decision-top';
-      const action = document.createElement('span'); action.className = `action action-${actionText.toLowerCase()}`; action.textContent = actionText.replace('_', ' ');
-      const timestamp = document.createElement('span'); timestamp.className = 'decision-time'; timestamp.textContent = timeLabel(decision.created_at || decision.bar_time);
-      top.append(action, timestamp);
-      const regime = document.createElement('div'); regime.className = 'decision-regime'; regime.textContent = `สภาวะ: ${String(decision.regime || 'ไม่ระบุ').replaceAll('_', ' ')}`;
-      const reason = document.createElement('p'); reason.className = 'decision-reason'; reason.textContent = decision.reason || 'ไม่มีเหตุผลแนบมา';
-      const meta = document.createElement('div'); meta.className = 'decision-meta';
-      for (const label of [`ความมั่นใจ ${hasNumber(decision.confidence) ? `${(Number(decision.confidence) * 100).toFixed(0)}%` : '—'}`, `Setup ${decision.setup || '—'}`, `SL ${number(decision.stop_atr, 2)} ATR`, `เป้า ${number(decision.target_r, 2)}R`, decision.shadow_mode ? 'Shadow' : 'EA ตรวจต่อ']) {
-        const tag = document.createElement('span'); tag.className = 'meta-tag'; tag.textContent = label; meta.appendChild(tag);
-      }
-      root.replaceChildren(top, regime, reason, meta);
-    }
-
-    function renderDecisions(decisions) {
-      const body = byId('decisionsTable');
-      setText('decisionCount', `${decisions.length} รายการ`);
-      if (!decisions.length) { emptyRow(body, 5, 'รอการตัดสินใจจาก MT5'); return; }
-      body.replaceChildren();
-      for (const item of decisions.slice(0, 12)) {
-        const row = document.createElement('tr');
-        cell(row, timeLabel(item.bar_time), 'numeric muted');
-        const act = cell(row, '');
-        const badge = document.createElement('span');
-        const actionName = String(item.action || 'NO_TRADE').toUpperCase();
-        badge.className = `action action-${actionName.toLowerCase()}`; badge.textContent = actionName.replace('_', ' '); act.appendChild(badge);
-        cell(row, String(item.regime || '—').replaceAll('_', ' '));
-        cell(row, hasNumber(item.confidence) ? `${(Number(item.confidence) * 100).toFixed(0)}%` : '—', 'numeric');
-        const why = cell(row, item.reason || '—', 'reason'); why.title = item.reason || '';
-        body.appendChild(row);
-      }
-    }
-    function renderTrades(trades) {
-      const body = byId('tradesTable');
-      setText('tradeCount', `${trades.length} รายการ`);
-      if (!trades.length) { emptyRow(body, 6, 'ยังไม่มีประวัติรายการที่ bridge บันทึก'); return; }
-      body.replaceChildren();
-      for (const trade of trades.slice(0, 12)) {
-        const row = document.createElement('tr');
-        cell(row, `#${trade.ticket ?? '—'}`, 'numeric muted');
-        cell(row, trade.direction || '—');
-        cell(row, number(trade.entry_price, 5), 'numeric');
-        cell(row, number(trade.close_price, 5), 'numeric');
-        const pnl = Number(trade.pnl_usd);
-        cell(row, hasNumber(trade.pnl_usd) ? amount(pnl) : '—', `numeric ${pnl > 0 ? 'positive' : (pnl < 0 ? 'negative' : '')}`);
-        const r = Number(trade.pnl_r);
-        cell(row, Number.isFinite(r) ? `${r > 0 ? '+' : ''}${r.toFixed(2)}R` : '—', `numeric ${r > 0 ? 'positive' : (r < 0 ? 'negative' : '')}`);
-        body.appendChild(row);
-      }
-    }
-
-    function renderMarket(market) {
-      latestMarket = market;
-      if (!market || !market.available) {
-        setText('feedStatus', 'ยังไม่รับข้อมูลราคา'); setPill('feedPill', 'รอ EA', 'warn');
-        setPill('freshnessPill', 'ยังรอข้อมูล', 'neutral');
-        setText('symbolName', market?.symbol || 'XAUUSD');
-        setText('symbolTimeframe', market?.timeframe ? `· ${market.timeframe}` : '· —');
-        renderEaMode(market);
-        for (const id of ['quoteBid', 'quoteAsk', 'quoteSpread', 'quoteTime', 'accountBalance', 'accountEquity']) setText(id, '—');
-        drawChart(null); renderPositions(market); return;
-      }
-      const age = ageMinutes(market.market_received_at);
-      const stale = age > 15;
-      setText('feedStatus', stale ? 'ข้อมูลจาก EA ค้าง' : `${market.symbol || 'XAUUSD'} · ${market.timeframe || 'M5'}`);
-      setPill('feedPill', stale ? 'ข้อมูลเก่า' : 'รับ snapshot แล้ว', stale ? 'warn' : '');
-      setPill('freshnessPill', stale ? 'snapshot เก่า' : `EA รับล่าสุด ${Math.max(0, Math.floor(age))} นาที`, stale ? 'warn' : '');
-      setText('quoteBid', number(market.bid, 5)); setText('quoteAsk', number(market.ask, 5));
-      setText('quoteSpread', number(market.spread_points, 1));
-      setText('quoteTime', rawTime(market.server_time));
-      setText('symbolName', market.symbol || 'XAUUSD');
-      setText('symbolTimeframe', `· ${market.timeframe || 'ไม่ระบุ TF'}`);
-      setText('accountBalance', market.balance == null ? '—' : amount(market.balance));
-      setText('accountEquity', market.equity == null ? '—' : amount(market.equity));
-      renderEaMode(market);
-      drawChart(market); renderPositions(market);
-    }
-
-    async function loadData() {
-      if (loading) return;
-      loading = true;
-      byId('refreshButton').disabled = true;
-      byId('refreshIcon').style.transform = 'rotate(90deg)';
-      const results = await Promise.allSettled([
-        fetchJson('/health'), fetchJson('/api/market'), fetchJson('/api/performance'), fetchJson('/api/decisions'), fetchJson('/api/trades'), fetchJson('/api/knowledge')
-      ]);
-      const [healthResult, marketResult, perfResult, decisionsResult, tradesResult, knowledgeResult] = results;
-
-      if (healthResult.status === 'fulfilled') {
-        const health = healthResult.value;
-        const online = health.status === 'online';
-        setText('bridgeStatus', online ? 'บริการพร้อม' : 'บริการมีปัญหา');
-        setPill('bridgePill', online ? 'ออนไลน์' : 'ขัดข้อง', online ? '' : 'down');
-        setText('aboutModel', health.model || 'ไม่ระบุ');
-        setText('aboutKey', health.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ยังไม่ตั้งค่า');
-        setText('aboutShadow', health.shadow_mode ? 'เปิด' : 'ปิด');
-      } else {
-        setText('bridgeStatus', 'ติดต่อ service ไม่ได้'); setPill('bridgePill', 'ออฟไลน์', 'down');
-      }
-
-      if (marketResult.status === 'fulfilled') renderMarket(marketResult.value);
-      else {
-        setText('feedStatus', 'อ่าน snapshot ไม่สำเร็จ'); setPill('feedPill', 'API ผิดพลาด', 'down');
-        setPill('freshnessPill', 'ตรวจการเชื่อมต่อ', 'down');
-        drawChart(latestMarket);
-      }
-
-      if (decisionsResult.status === 'fulfilled') {
-        const decisions = decisionsResult.value;
-        renderDecisions(decisions); renderLatestDecision(decisions[0]);
-      }
-      if (perfResult.status === 'fulfilled') {
-        const perf = perfResult.value;
-        setText('statTotal', String(perf.total_trades || 0));
-        const pnl = Number(perf.net_pnl_usd);
-        const pnlNode = byId('statPnlAccount');
-        pnlNode.textContent = hasNumber(perf.net_pnl_usd) ? amount(pnl) : '—';
-        pnlNode.className = `account-value${pnl > 0 ? ' positive' : (pnl < 0 ? ' negative' : '')}`;
-      }
-      if (tradesResult.status === 'fulfilled') renderTrades(tradesResult.value);
-      if (knowledgeResult.status === 'fulfilled') {
-        const knowledge = knowledgeResult.value;
-        setText('knowledgeRules', knowledge.trading_rules || 'ยังไม่มีการบันทึกกฎ');
-        setText('knowledgePrefs', knowledge.strategy_preferences || 'ยังไม่มีแนวทางกลยุทธ์');
-        setText('knowledgeInsights', knowledge.market_insights || 'ยังไม่มีข้อสังเกตตลาด');
-      }
-
-      const now = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
-      setText('lastUpdated', `หน้าเว็บอัปเดต ${now}`);
-      byId('refreshButton').disabled = false;
-      byId('refreshIcon').style.transform = '';
-      loading = false;
-    }
-
-    byId('refreshButton').addEventListener('click', loadData);
-    loadData();
-    setInterval(loadData, 10000);
-    window.addEventListener('resize', () => drawChart(latestMarket));
-    document.querySelectorAll('.nav a, .mobile-nav a').forEach((link) => {
-      link.addEventListener('click', () => {
-        document.querySelectorAll('.nav a, .mobile-nav a').forEach((item) => item.classList.remove('active'));
-        document.querySelectorAll(`a[href="${link.getAttribute('href')}"]`).forEach((item) => item.classList.add('active'));
+      ctx.textAlign = 'center';
+      const every = Math.max(1, Math.ceil(candles.length / 6));
+      candles.forEach((c, i) => {
+        if (i % every === 0 && c.label) { ctx.fillStyle = muted; ctx.fillText(c.label.slice(11, 16), xc(i), h - 10); }
       });
+
+      const up = css('--chart-up'), down = css('--chart-down');
+      const bw = Math.max(2, Math.min(12, step * 0.62));
+      candles.forEach((c, i) => {
+        const color = c.c >= c.o ? up : down;
+        const x = xc(i);
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, y(c.h)); ctx.lineTo(Math.round(x) + 0.5, y(c.l)); ctx.stroke();
+        const y1 = y(Math.max(c.o, c.c)), y2 = y(Math.min(c.o, c.c));
+        ctx.globalAlpha = chart.hover === i ? 1 : 0.92;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x - bw / 2, y1, bw, Math.max(1.5, y2 - y1), 1.5); else ctx.rect(x - bw / 2, y1, bw, Math.max(1.5, y2 - y1));
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+
+      // AI markers on the signal candle
+      const byBar = {};
+      (state.decisions || []).forEach((d) => { if (d.candidate_side && !byBar[d.bar_time]) byBar[d.bar_time] = d; });
+      candles.forEach((c, i) => {
+        const d = byBar[c.label];
+        if (!d) return;
+        const buy = d.candidate_side === 'BUY', approved = d.ai_verdict === 'approved';
+        const x = xc(i), yy = buy ? y(c.l) + 12 : y(c.h) - 12, s = 5;
+        ctx.beginPath();
+        if (buy) { ctx.moveTo(x, yy - s); ctx.lineTo(x - s, yy + s); ctx.lineTo(x + s, yy + s); }
+        else { ctx.moveTo(x, yy + s); ctx.lineTo(x - s, yy - s); ctx.lineTo(x + s, yy - s); }
+        ctx.closePath();
+        if (approved) { ctx.fillStyle = buy ? up : down; ctx.fill(); }
+        else { ctx.strokeStyle = css('--faint'); ctx.lineWidth = 1.5; ctx.stroke(); }
+      });
+
+      // Position levels
+      const blue = css('--blue');
+      positions.forEach((p) => {
+        [[p.entry_price, blue, 'Entry'], [p.sl_price, down, 'SL'], [p.tp_price, up, 'TP']].forEach(([v, color, label]) => {
+          if (!(v > 0) || v < lo || v > hi) return;
+          const yy = Math.round(y(v)) + 0.5;
+          ctx.setLineDash([5, 4]); ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(w - right, yy); ctx.stroke(); ctx.setLineDash([]);
+          tag(ctx, `${label} ${fmt(v)}`, w - right + 2, yy, color);
+        });
+      });
+
+      // Last price
+      if (typeof m.bid === 'number' && m.bid > lo && m.bid < hi) {
+        const yy = Math.round(y(m.bid)) + 0.5;
+        ctx.setLineDash([2, 3]); ctx.strokeStyle = css('--gold'); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(left, yy); ctx.lineTo(w - right, yy); ctx.stroke(); ctx.setLineDash([]);
+        tag(ctx, fmt(m.bid), w - right + 2, yy, css('--gold'));
+      }
+
+      // Crosshair
+      if (chart.hover != null && candles[chart.hover]) {
+        const x = Math.round(xc(chart.hover)) + 0.5;
+        ctx.strokeStyle = muted; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + ph); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    }
+
+    function tag(ctx, text, x, yy, color) {
+      ctx.font = '600 10.5px Inter, sans-serif';
+      const tw = ctx.measureText(text).width + 10;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, yy - 9, tw, 18, 5); else ctx.rect(x, yy - 9, tw, 18);
+      ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+      ctx.fillText(text, x + 5, yy + 0.5);
+      ctx.font = '11px Inter, "Noto Sans Thai", sans-serif';
+    }
+
+    chart.canvas.addEventListener('mousemove', (ev) => {
+      const L = chart.layout;
+      if (!L) return;
+      const rect = chart.canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const i = Math.floor((x - L.left) / L.step);
+      if (i < 0 || i >= L.candles.length) { hideTip(); return; }
+      if (chart.hover !== i) { chart.hover = i; drawChart(); }
+      const c = L.candles[i], tip = $('tooltip');
+      const chg = c.c - c.o;
+      tip.innerHTML = `<b>${esc(c.label || '')}</b><br>O ${fmt(c.o)} · H ${fmt(c.h)}<br>L ${fmt(c.l)} · C <b class="${chg >= 0 ? 'up' : 'down'}">${fmt(c.c)}</b>`;
+      const tx = Math.min(L.w - 170, Math.max(0, L.xc(i) + 14));
+      tip.style.left = `${tx}px`; tip.style.top = '8px'; tip.style.opacity = '1';
     });
+    function hideTip() { $('tooltip').style.opacity = '0'; if (chart.hover != null) { chart.hover = null; drawChart(); } }
+    chart.canvas.addEventListener('mouseleave', hideTip);
+
+    function drawSpark() {
+      const pts = (state?.equity || []).map((p) => p.equity).filter((v) => typeof v === 'number');
+      const { ctx, w, h } = setupCanvas($('spark'));
+      ctx.clearRect(0, 0, w, h);
+      if (pts.length < 2) return;
+      const lo = Math.min(...pts), hi = Math.max(...pts), r = hi - lo || 1;
+      const color = pts[pts.length - 1] >= pts[0] ? css('--chart-up') : css('--chart-down');
+      const X = (i) => i / (pts.length - 1) * w, Y = (v) => h - 3 - (v - lo) / r * (h - 6);
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00');
+      ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+      ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+
+    // ---------- Tabs ----------
+    function moveThumb() {
+      const active = document.querySelector('#tabs button.active');
+      const thumb = $('segThumb');
+      thumb.style.left = `${active.offsetLeft}px`;
+      thumb.style.width = `${active.offsetWidth}px`;
+    }
+    document.querySelectorAll('#tabs button').forEach((btn) => btn.addEventListener('click', () => {
+      document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.id === btn.dataset.tab));
+      moveThumb();
+      if (btn.dataset.tab === 'tabSystem' && !knowledgeLoaded) loadKnowledge();
+    }));
+
+    async function loadKnowledge() {
+      try {
+        const k = await (await fetch('/api/knowledge', { cache: 'no-store' })).json();
+        $('kRules').textContent = k.trading_rules || '—';
+        $('kPrefs').textContent = k.strategy_preferences || '—';
+        $('kInsights').textContent = k.market_insights || '—';
+        knowledgeLoaded = true;
+      } catch (e) { $('kRules').textContent = 'โหลดไม่สำเร็จ'; }
+    }
+
+    // ---------- Loop ----------
+    async function refresh() {
+      try {
+        const res = await fetch('/api/overview', { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        state = await res.json();
+      } catch (e) {
+        state = state ? { ...state, health: null } : { health: null, market: {} };
+      }
+      renderNav(state); renderHero(state); renderDecision(state); renderStats(state);
+      renderEdge(state); renderChecklist(state); renderPositions(state); renderTables(state);
+      drawChart(); drawSpark();
+    }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { moveThumb(); drawChart(); drawSpark(); }, 120); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawChart(); drawSpark(); });
+    moveThumb();
+    refresh();
+    setInterval(refresh, 5000);
   </script>
 </body>
 </html>

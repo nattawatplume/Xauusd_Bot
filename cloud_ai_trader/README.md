@@ -2,17 +2,31 @@
 
 This directory contains an experimental FastAPI/Gemini decision service and a small SQLite-backed dashboard. It is a separate prototype from `AI_XAU_V1/service`, which uses the local Ollama bridge.
 
-## Current scope
+## How a decision is made
 
-- MT5 can submit a market snapshot to `POST /v1/decision`; the service returns a structured proposal. The EA remains responsible for checking the response and sending or rejecting an order.
-- The dashboard reads `GET /api/market`. The updated `AI_XAU_V1/MQL5/Experts/XAU_AI_Trader.mq5` sends up to 60 closed MT5 candles, the broker quote/account currency, and the EA's broker-confirmed positions. Entry/SL/TP changes are synced after MT5 trade transactions. The page draws only those supplied values; its quote refreshes on an EA snapshot, not on every tick.
-- When AI trading filters block a new decision (or Shadow mode already has a position), the EA can send a market-only update to `POST /v1/market` without asking Gemini for another decision.
-- Latest market data are held in service memory and are cleared when the service restarts. The next MT5 sync restores them. Older EA builds may provide only eight chart bars and may not expose exact position levels.
-- MT5 can submit a close notification to `POST /v1/trade_closed`; the service records a reflection. The current EA notification does not include the opening event or initial cash risk, so this prototype cannot yet produce a complete trade ledger or trustworthy R-multiples from that notification alone.
-- The dashboard and JSON endpoints display service memory. They are not an authenticated operator console; keep the service private.
-- Daily review runs inside the Python process. It is not an independent scheduler and does not run while the service is stopped.
-- AI review suggestions are recorded for a human to inspect. They do not automatically change live EA parameters or validated trading rules.
-- This service does not independently place broker orders and its AI output is not evidence of a profitable strategy.
+1. On every closed M5 bar the EA posts a snapshot to `POST /v1/decision` (or `POST /v1/market` when filters or an open position block a new entry).
+2. Code, not the LLM, computes the market context: an ADX/RSI regime heuristic, a 30-minute high-impact USD news window from the EA's calendar data, and the rule-based setup candidates in `MarketAnalyzer._technical_candidates` (M15-trend pullback and six-bar breakout).
+3. With no candidate and no open position the service answers `NO_TRADE` immediately; Gemini is not called. This removes most API calls and their latency.
+4. With a candidate, Gemini receives the compact snapshot and the candidates and may only approve one (same direction) or veto it. Calls use `thinkingLevel=low`, fall back to `LLM_FALLBACK_MODEL`, and must finish within `DECISION_BUDGET_S` (default 15 s, below the EA's 20 s timeout). A late or failed call is fail-closed `NO_TRADE` with `ai_verdict=unavailable`.
+5. The EA still applies every risk check and is the only component that can send an order.
+
+## Shadow tracking: does the AI add value?
+
+Every candidate bar is stored with an entry reference, ATR stop and R target, whether the AI approved it, rejected it, was unavailable, or a guardrail blocked it. Each later snapshot scores pending setups against the following M5 candles (stop/target touch, same-bar touch counts as a loss, exit after `max_hold_bars`). The dashboard compares the expectancy of "AI approved" against "AI rejected". The filter is only useful if approved setups clearly beat rejected ones over a meaningful sample (30+ each as a minimum, preferably hundreds).
+
+## Trade ledger
+
+The EA reports `POST /v1/trade_opened` (MT5 position id, entry, SL/TP, cash risk at the initial stop) and `POST /v1/trade_closed` (net profit including swap and commission across all deals of the position). The service computes the R multiple from the opening risk, records it, then runs the LLM reflection in the background so the EA is not blocked. Failed reflections are not written into the knowledge files.
+
+## Research result (read before enabling trading)
+
+`python backtest_ai_candidates.py --mt5 --bars 100000 --json cloud_ai_trader/data/backtest_summary.json` replays the exact candidate function on the broker's M5 history. On FBS XAUUSD from 2025-05 to 2026-10 (100,000 bars, average spread 0.24 USD, 0.05 USD slippage per side) the candidates, taken without the AI, returned about -0.05R per trade (PF 0.90, 5,429 trades) in both the in-sample and out-of-sample thirds. Before costs they were about breakeven (PF 1.02), and the reversed signals also lost, so the rules have no measurable edge and costs make them negative. No trading session or stop/target pair tested was positive. The LLM can only make this profitable by vetoing the losing majority very accurately; the shadow comparison above is how to find out. Keep `AIShadowMode=true`.
+
+## Other notes
+
+- Latest market data are held in service memory and are cleared when the service restarts. The next MT5 sync restores them.
+- The dashboard and JSON endpoints are not an authenticated operator console; keep the service private.
+- Daily review runs inside the Python process and does not run while the service is stopped. AI review suggestions are recorded for a human to inspect; they do not change live EA parameters.
 
 ## Local setup
 
@@ -33,9 +47,11 @@ Start with:
 python main.py
 ```
 
-By default, the API binds to `127.0.0.1:8765`. Open `http://127.0.0.1:8765/dashboard` on that same machine. In MT5, allow the bridge URL under **Tools → Options → Expert Advisors** and set the EA URL/token inputs to match. Shadow mode and EA trading-disabled defaults should remain in place during observation.
+If another program already uses port 8766, set a different `PORT` in `.env` and change the EA input `AIBridgeURL` and the MT5 WebRequest allow-list to the same port.
 
-For the dashboard's live-data panel, compile and attach the updated `AI_XAU_V1/MQL5/Experts/XAU_AI_Trader.mq5` in MetaEditor. `AI_XAU_V1/service` is a separate Ollama bridge and also defaults to port `8765`; do not start both services on that same port. The Cloud dashboard reads data from the FastAPI process in this directory.
+By default, the API binds to `127.0.0.1:8766`, which matches the EA's default `AIBridgeURL`. Open `http://127.0.0.1:8766/dashboard` on that same machine. In MT5, allow the bridge URL under **Tools → Options → Expert Advisors** and set the EA URL/token inputs to match. Shadow mode and EA trading-disabled defaults should remain in place during observation.
+
+For the dashboard's live-data panel, compile and attach the updated `AI_XAU_V1/MQL5/Experts/XAU_AI_Trader.mq5` in MetaEditor. `AI_XAU_V1/service` is a separate Ollama bridge on port `8765`; to use it instead, set the EA input `AIBridgeURL` to `http://127.0.0.1:8765/v1/decision`. The Cloud dashboard reads data from the FastAPI process in this directory.
 
 ## VPS
 

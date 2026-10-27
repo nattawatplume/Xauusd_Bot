@@ -19,3 +19,5 @@ tiers.txt
 Xauusd_Bot-main/
 XAU_BOS_EA.mq5
 backtest_xau.py
+cloud_ai_trader/knowledge/changelog.jsonl
+cloud_ai_trader/data/backtest_summary.json

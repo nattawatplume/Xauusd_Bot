@@ -1,7 +1,9 @@
 """FastAPI Bridge Server connecting MetaTrader 5 and the Cloud AI Brain."""
 from __future__ import annotations
 
+import asyncio
 import hmac
+import json
 import logging
 import math
 from datetime import datetime, timezone
@@ -13,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from config import settings
 from brain.orchestrator import AIBrain
+from brain.shadow_tracker import bar_epoch
 from data.database import init_db
 
 log = logging.getLogger("ai_trader.api")
@@ -130,6 +133,38 @@ def _record_market_snapshot(snapshot: dict[str, Any]) -> None:
     latest_market_state = state
 
 
+async def _ingest_snapshot(snapshot: dict[str, Any]) -> None:
+    """Record dashboard state, score pending shadow setups and log equity for this bar."""
+    _record_market_snapshot(snapshot)
+    if brain is None or latest_market_state is None:
+        return
+    try:
+        if _finite_number(snapshot.get("atr_m5")):
+            context = await brain.analyzer.analyze(snapshot)
+            brain.latest_context = {"bar_time": latest_market_state["bar_time"], **context}
+        constraints = snapshot.get("constraints") if isinstance(snapshot.get("constraints"), dict) else {}
+        max_hold = constraints.get("max_hold_bars")
+        await brain.shadow.resolve(latest_market_state["candles"], int(max_hold) if _finite_number(max_hold) else None)
+        t = bar_epoch(latest_market_state["bar_time"])
+        if t is not None and (latest_market_state["equity"] is not None or latest_market_state["balance"] is not None):
+            await brain.memory.log_equity(t, latest_market_state["balance"], latest_market_state["equity"])
+    except Exception as exc:
+        log.warning("Snapshot bookkeeping failed: %s", exc)
+
+
+def _fail_closed(snapshot: dict[str, Any], reason: str) -> dict[str, Any]:
+    return {
+        "action": "NO_TRADE",
+        "confidence": 0.0,
+        "regime": "unclear",
+        "setup": "none",
+        "stop_atr": settings.MIN_STOP_ATR,
+        "target_r": settings.MIN_TARGET_R,
+        "reason": reason,
+        "bar_time": str(snapshot.get("bar_time", "")),
+    }
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
     global brain
@@ -164,7 +199,7 @@ async def get_decision(
 
     try:
         if str(snapshot.get("symbol", "")).upper().startswith("XAUUSD"):
-            _record_market_snapshot(snapshot)
+            await _ingest_snapshot(snapshot)
         # Chart and exact position details are for the dashboard only; the analysis
         # pipeline retains its existing compact decision payload.
         dashboard_only = {
@@ -172,19 +207,14 @@ async def get_decision(
             "legacy_signal_fallback", "terminal_connected", "terminal_trade_allowed", "ea_trade_allowed",
         }
         decision_snapshot = {key: value for key, value in snapshot.items() if key not in dashboard_only}
-        decision = await brain.process_bar(decision_snapshot)
-        return decision
+        # Answer before the EA's WebRequest timeout; a late answer is useless to it.
+        return await asyncio.wait_for(brain.process_bar(decision_snapshot), timeout=settings.DECISION_BUDGET_S + 2.0)
+    except asyncio.TimeoutError:
+        log.warning("Decision exceeded %.0fs budget; fail-closed", settings.DECISION_BUDGET_S + 2.0)
+        return _fail_closed(snapshot, "Fail-closed: decision exceeded time budget")
     except Exception as exc:
         log.exception("Error processing bar decision: %s", exc)
-        return {
-            "action": "NO_TRADE",
-            "confidence": 0.0,
-            "regime": "unclear",
-            "setup": "none",
-            "stop_atr": settings.MIN_STOP_ATR,
-            "target_r": settings.MIN_TARGET_R,
-            "reason": f"Fail-closed: Error in bridge ({type(exc).__name__})",
-        }
+        return _fail_closed(snapshot, f"Fail-closed: Error in bridge ({type(exc).__name__})")
 
 
 @app.post("/v1/market")
@@ -195,8 +225,44 @@ async def update_market(
     """Receive an MT5 chart snapshot without invoking the AI or changing trading."""
     if not str(snapshot.get("symbol", "")).upper().startswith("XAUUSD"):
         raise HTTPException(status_code=400, detail="unsupported symbol")
-    _record_market_snapshot(snapshot)
+    await _ingest_snapshot(snapshot)
     return {"status": "ok", "received_at": latest_market_state["market_received_at"] if latest_market_state else None}
+
+
+@app.post("/v1/trade_opened")
+async def trade_opened(
+    trade: dict[str, Any],
+    token: str = Depends(verify_token),
+) -> dict[str, Any]:
+    """Broker-confirmed entry from the EA; tagged with the AI decision that preceded it."""
+    if brain is None:
+        raise HTTPException(status_code=503, detail="Brain not initialized")
+    numeric = ("ticket", "entry_price", "volume")
+    if str(trade.get("direction", "")).upper() not in {"BUY", "SELL"} or any(not _finite_number(trade.get(k)) for k in numeric):
+        raise HTTPException(status_code=400, detail="trade is missing valid broker values")
+    approved = brain.last_approved or {}
+    record = {
+        "ticket": int(trade["ticket"]),
+        "symbol": trade.get("symbol", "XAUUSD"),
+        "direction": str(trade["direction"]).upper(),
+        "entry_price": float(trade["entry_price"]),
+        "sl_price": float(trade.get("sl_price") or 0.0),
+        "tp_price": float(trade.get("tp_price") or 0.0),
+        "lot_size": float(trade["volume"]),
+        "open_time": trade.get("open_time"),
+        "risk_usd": float(trade["risk_usd"]) if _finite_number(trade.get("risk_usd")) and trade["risk_usd"] > 0 else None,
+        "regime": approved.get("regime", "unclear"),
+        "setup": approved.get("setup", "none"),
+        "ai_confidence": approved.get("confidence", 0.0),
+        "ai_reason": approved.get("reason", ""),
+    }
+    await brain.memory.log_trade_opened(record)
+    return {"status": "ok", "ticket": record["ticket"]}
+
+
+def _hold_bars(open_time: Any, close_time: Any) -> int:
+    start, end = bar_epoch(str(open_time or "")), bar_epoch(str(close_time or ""))
+    return max(0, (end - start) // 300) if start is not None and end is not None else 0
 
 
 @app.post("/v1/trade_closed")
@@ -208,12 +274,19 @@ async def trade_closed(
     if brain is None:
         raise HTTPException(status_code=503, detail="Brain not initialized")
 
+    if not trade_result.get("hold_bars"):
+        trade_result["hold_bars"] = _hold_bars(trade_result.get("open_time"), trade_result.get("close_time"))
+    # The ledger update is quick; the LLM reflection runs after the EA has its answer.
+    trade = await brain.memory.log_trade_closed(trade_result)
+    asyncio.create_task(_reflect(trade_result, trade))
+    return {"status": "ok", "ticket": trade.get("ticket"), "pnl_r": trade.get("pnl_r")}
+
+
+async def _reflect(trade_result: dict[str, Any], trade: dict[str, Any]) -> None:
     try:
-        reflection = await brain.process_trade_closed(trade_result)
-        return {"status": "ok", "reflection": reflection}
+        await brain.process_trade_closed(trade_result, trade)
     except Exception as exc:
         log.exception("Error processing trade reflection: %s", exc)
-        return {"status": "error", "detail": str(exc)}
 
 
 @app.post("/v1/positions")
@@ -268,6 +341,7 @@ async def health_check() -> dict[str, Any]:
     return {
         "status": "online",
         "model": settings.LLM_MODEL,
+        "fallback_model": settings.LLM_FALLBACK_MODEL,
         "shadow_mode": settings.SHADOW_MODE,
         "enable_trading": settings.ENABLE_TRADING,
         "gemini_api_configured": bool(settings.GEMINI_API_KEY),
@@ -311,6 +385,33 @@ async def api_knowledge() -> dict[str, Any]:
         "trading_rules": brain.memory.get_trading_rules(),
         "strategy_preferences": brain.memory.get_strategy_preferences(),
         "market_insights": brain.memory.get_market_insights(),
+    }
+
+
+def _backtest_summary() -> dict[str, Any] | None:
+    path = settings.BASE_DIR / "data" / "backtest_summary.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    except (OSError, ValueError):
+        return None
+
+
+@app.get("/api/overview")
+async def api_overview() -> dict[str, Any]:
+    """Everything the dashboard needs in one request."""
+    market = await api_market()
+    if brain is None:
+        return {"health": await health_check(), "market": market}
+    return {
+        "health": await health_check(),
+        "market": market,
+        "context": brain.latest_context,
+        "performance": await brain.memory.get_performance_summary(),
+        "shadow": await brain.shadow.summary(),
+        "decisions": await brain.memory.get_recent_decisions(limit=40),
+        "trades": await brain.memory.get_recent_trades(limit=25),
+        "equity": await brain.memory.get_equity_curve(),
+        "backtest": _backtest_summary(),
     }
 
 
