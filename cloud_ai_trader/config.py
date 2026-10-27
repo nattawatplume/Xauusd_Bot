@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_S: float = 8.0
     # "low" roughly halves Gemini 3 latency; empty string uses the model default.
     LLM_THINKING_LEVEL: str = "low"
+    # Ask the LLM about EXIT on every bar while a position is open. Off by default:
+    # free-tier Gemini allows about 20 requests per model per day.
+    LLM_REVIEW_OPEN_POSITIONS: bool = False
     # Whole decision must finish before the EA's AITimeoutMs (20 s default).
     DECISION_BUDGET_S: float = 15.0
 

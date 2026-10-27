@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from config import settings
+from brain.llm_client import quota_wait_s
 from brain.orchestrator import AIBrain
 from brain.shadow_tracker import bar_epoch
 from data.database import init_db
@@ -345,6 +346,10 @@ async def health_check() -> dict[str, Any]:
         "shadow_mode": settings.SHADOW_MODE,
         "enable_trading": settings.ENABLE_TRADING,
         "gemini_api_configured": bool(settings.GEMINI_API_KEY),
+        # Minutes until each out-of-quota model may be used again (empty when all usable).
+        "quota_wait_min": {
+            m: round(quota_wait_s(m) / 60) for m in (settings.LLM_MODEL, settings.LLM_FALLBACK_MODEL) if quota_wait_s(m) > 0
+        },
     }
 
 

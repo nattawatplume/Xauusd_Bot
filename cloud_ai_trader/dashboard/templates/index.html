@@ -552,6 +552,15 @@
       $('verdict').innerHTML = `<strong>${esc(title)}</strong>${esc(body)}`;
     }
 
+    function quotaItem(h) {
+      const waits = Object.entries(h.quota_wait_min || {});
+      if (!h.status) return ['โควตา Gemini', null, 'รอข้อมูล'];
+      if (!waits.length) return ['โควตา Gemini', true, 'ใช้ได้ทุกโมเดล'];
+      const both = waits.length >= 2;
+      const note = waits.map(([m, min]) => `${m} หมด (อีก ${min >= 60 ? Math.round(min / 60) + ' ชม.' : min + ' นาที'})`).join(' · ');
+      return ['โควตา Gemini', both ? false : null, note];
+    }
+
     function renderChecklist(o) {
       const m = o.market || {}, h = o.health || {};
       const age = ageMin(m.market_received_at);
@@ -559,6 +568,7 @@
       const items = [
         ['Cloud service', h.status === 'online', h.status === 'online' ? `${h.model} · สำรอง ${h.fallback_model}` : 'ไม่ตอบสนอง'],
         ['Gemini API key', h.gemini_api_configured, h.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ใส่ GEMINI_API_KEY ใน .env'],
+        quotaItem(h),
         ['ข้อมูลจาก EA', age != null && age < 7, age == null ? 'ยังไม่เคยได้รับ snapshot' : `ล่าสุด ${Math.round(age)} นาทีก่อน`],
         ['MT5 เชื่อมต่อโบรกเกอร์', m.terminal_connected, m.terminal_connected == null ? 'รอข้อมูล' : m.terminal_connected ? 'เชื่อมต่อแล้ว' : 'ขาดการเชื่อมต่อ'],
         ['Algo Trading ใน MT5', algo, algo == null ? 'รอข้อมูล' : algo ? 'อนุญาต' : 'ปิดอยู่ — กดปุ่ม Algo Trading ใน MT5'],

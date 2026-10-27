@@ -81,6 +81,18 @@ class DecisionEngine:
                 "reason": "No technical candidate on this closed bar.",
                 "ai_verdict": "no_candidate",
             }
+        if position != "none" and not settings.LLM_REVIEW_OPEN_POSITIONS:
+            # The EA's stop, target and time exit manage the trade; save the daily quota.
+            return {
+                "action": "NO_TRADE",
+                "confidence": 0.0,
+                "regime": regime,
+                "setup": "none",
+                "stop_atr": settings.MIN_STOP_ATR,
+                "target_r": settings.MIN_TARGET_R,
+                "reason": "Position open: managed by the EA's SL, TP and time exit.",
+                "ai_verdict": "position",
+            }
 
         # ---------------------------------------------------------------------
         # Call LLM to approve or veto the candidate (or manage an open position)

@@ -8,12 +8,33 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import time
 from typing import Any
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from config import settings
 
 log = logging.getLogger("ai_trader.llm")
+
+# Model -> epoch seconds until which Gemini reported it out of quota (HTTP 429).
+_QUOTA_UNTIL: dict[str, float] = {}
+
+
+def quota_wait_s(model: str) -> float:
+    """Seconds until a model that hit its quota may be tried again (0 if usable)."""
+    return max(0.0, _QUOTA_UNTIL.get(model, 0.0) - time.time())
+
+
+def _retry_delay_s(exc: HTTPError) -> float:
+    """Gemini's suggested retryDelay ("44737s"), bounded to 1 minute .. 24 hours."""
+    try:
+        match = re.search(r'"retryDelay":\s*"(\d+(?:\.\d+)?)s"', exc.read().decode("utf-8", "replace"))
+        delay = float(match.group(1)) if match else 60.0
+    except Exception:
+        delay = 60.0
+    return min(max(delay, 60.0), 86400.0)
 
 DECISION_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
@@ -106,29 +127,36 @@ class LLMClient:
         response_schema: dict[str, Any] | None = None,
         default_fallback: dict[str, Any] | None = None,
         budget_s: float | None = None,
+        primary: str | None = None,
     ) -> dict[str, Any]:
         """Generate structured JSON within a time budget, then fail closed.
 
-        Order: primary model, the lighter fallback model, then the primary again
-        while time remains. Each attempt is capped by LLM_TIMEOUT_S and by the
-        remaining budget so the EA always gets an answer before its own timeout.
-        Failure is marked with "_llm_error" so callers can tell a real NO_TRADE
-        from an unavailable model.
+        Order: primary model, the other model, then the primary again while time
+        remains. Models Gemini reported out of quota are skipped until their reset.
+        Each attempt is capped by LLM_TIMEOUT_S and by the remaining budget so the
+        EA always gets an answer before its own timeout. Failure is marked with
+        "_llm_error" so callers can tell a real NO_TRADE from an unavailable model.
         """
         fallback = dict(default_fallback or {})
         if not self.api_key:
             log.warning("GEMINI_API_KEY is not set. Returning safe default.")
             return {**fallback, "_llm_error": "no_api_key"}
 
-        attempts = [self.model]
-        if settings.LLM_FALLBACK_MODEL and settings.LLM_FALLBACK_MODEL != self.model:
-            attempts.append(settings.LLM_FALLBACK_MODEL)
-        attempts += [self.model] * max(0, self.max_retries - 1)
+        first = primary or self.model
+        second = settings.LLM_FALLBACK_MODEL if first == self.model else self.model
+        attempts = [first]
+        if second and second != first:
+            attempts.append(second)
+        attempts += [first] * max(0, self.max_retries - 1)
 
         loop = asyncio.get_running_loop()
         deadline = loop.time() + budget_s if budget_s else None
-        last_error = "unknown"
-        for attempt, model in enumerate(attempts, start=1):
+        last_error = "quota_exhausted"
+        attempt = 0
+        for model in attempts:
+            if quota_wait_s(model) > 0:
+                continue  # out of quota until Google's reset; don't spend the time budget on it
+            attempt += 1
             timeout = settings.LLM_TIMEOUT_S
             if deadline is not None:
                 timeout = min(timeout, deadline - loop.time() - 0.2)
@@ -149,6 +177,14 @@ class LLMClient:
                     return parsed
                 last_error = "non_dict_json"
                 log.warning("LLM response was not a JSON dictionary: %s", text_response[:100])
+            except HTTPError as exc:
+                last_error = f"HTTP {exc.code}"
+                if exc.code == 429:
+                    _QUOTA_UNTIL[model] = time.time() + _retry_delay_s(exc)
+                    last_error = "quota_exhausted"
+                    log.warning("LLM %s out of quota for %.0f min", model, quota_wait_s(model) / 60)
+                else:
+                    log.warning("LLM attempt %d (%s) failed: %s", attempt, model, exc)
             except Exception as exc:
                 last_error = type(exc).__name__
                 log.warning("LLM attempt %d (%s) failed: %s", attempt, model, exc)
@@ -188,7 +224,9 @@ class LLMClient:
         return await self.generate_json(
             system_instruction=f"{system_prompt}\n\n{decision_prompt}",
             user_content=json.dumps(user_data, ensure_ascii=False),
+            response_schema=DECISION_SCHEMA,
             default_fallback=fallback,
+            budget_s=settings.DECISION_BUDGET_S - 1.0,
         )
 
     async def reflect_on_trade(
@@ -219,6 +257,7 @@ class LLMClient:
             system_instruction=f"{system_prompt}\n\n{reflection_prompt}",
             user_content=json.dumps(user_data, ensure_ascii=False),
             default_fallback=fallback,
+            primary=settings.LLM_FALLBACK_MODEL,
         )
 
     async def daily_review(
@@ -251,4 +290,5 @@ class LLMClient:
             system_instruction=f"{system_prompt}\n\n{daily_review_prompt}",
             user_content=json.dumps(user_data, ensure_ascii=False),
             default_fallback=fallback,
+            primary=settings.LLM_FALLBACK_MODEL,
         )
