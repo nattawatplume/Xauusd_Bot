@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gold Desk Journal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f5f7; --card: rgba(255, 255, 255, 0.86); --card-solid: #ffffff; --line: rgba(0, 0, 0, 0.07);
+      --text: #1d1d1f; --muted: #6e6e73; --faint: #a1a1a6; --blue: #0071e3; --green: #1f9d55; --red: #e0352b;
+      --orange: #d97a00; --green-soft: rgba(52, 199, 89, 0.13); --red-soft: rgba(255, 59, 48, 0.12);
+      --orange-soft: rgba(255, 149, 0, 0.14); --blue-soft: rgba(0, 113, 227, 0.1); --gray-soft: rgba(120, 120, 128, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.06); --nav: rgba(245, 245, 247, 0.72);
+      --radius: 22px; --chart-grid: rgba(0, 0, 0, 0.06);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #000000; --card: rgba(28, 28, 30, 0.82); --card-solid: #1c1c1e; --line: rgba(255, 255, 255, 0.08);
+        --text: #f5f5f7; --muted: #98989d; --faint: #636366; --blue: #2997ff; --green: #30d158; --red: #ff453a;
+        --orange: #ff9f0a; --nav: rgba(0, 0, 0, 0.66); --chart-grid: rgba(255, 255, 255, 0.07);
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.35);
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #000000; --card: rgba(28, 28, 30, 0.82); --card-solid: #1c1c1e; --line: rgba(255, 255, 255, 0.08);
+      --text: #f5f5f7; --muted: #98989d; --faint: #636366; --blue: #2997ff; --green: #30d158; --red: #ff453a;
+      --orange: #ff9f0a; --nav: rgba(0, 0, 0, 0.66); --chart-grid: rgba(255, 255, 255, 0.07);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 "Inter", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; transition: background 0.4s ease, color 0.4s ease;
+    }
+    button { font: inherit; color: inherit; }
+    .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+    .up { color: var(--green); } .down { color: var(--red); }
+
+    .nav { position: sticky; top: 0; z-index: 20; background: var(--nav); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--line); }
+    .nav-inner { max-width: 1100px; margin: 0 auto; height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -0.02em; white-space: nowrap; }
+    .brand-mark { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #f7d774 0%, #d4a017 55%, #9c6b00 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(180, 130, 0, 0.35); }
+    .nav-spacer { flex: 1; }
+    .nav-link { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 999px; transition: background 0.2s, color 0.2s; }
+    .nav-link:hover { background: var(--gray-soft); color: var(--text); }
+    .nav-link.active { background: var(--gray-soft); color: var(--text); }
+    .icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--gray-soft); cursor: pointer; display: grid; place-items: center; transition: transform 0.2s ease; flex: none; }
+    .icon-btn:hover { transform: scale(1.06); }
+    .icon-btn svg { width: 17px; height: 17px; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; min-width: 0; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .sub { font-size: 13px; color: var(--muted); }
+    .reveal { opacity: 0; transform: translateY(14px); animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+
+    .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    h1 { font-size: 34px; line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 4px; font-weight: 700; }
+    .segmented { position: relative; display: inline-flex; padding: 3px; border-radius: 11px; background: var(--gray-soft); }
+    .segmented button { border: 0; background: none; padding: 6px 14px; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; color: var(--muted); transition: color 0.25s, background 0.25s, box-shadow 0.25s; }
+    .segmented button.active { color: var(--text); background: var(--card-solid); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+    .banner { display: flex; gap: 12px; align-items: flex-start; padding: 14px 18px; border-radius: 16px; margin-bottom: 18px; font-size: 14px; background: var(--orange-soft); }
+    .banner.ok { background: var(--green-soft); }
+    .banner strong { display: block; margin-bottom: 2px; }
+    .banner span { color: var(--muted); }
+    .banner .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--orange); margin-top: 6px; flex: none; }
+    .banner.ok .dot { background: var(--green); }
+
+    .today { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; margin-bottom: 18px; }
+    .today-main .big { font-size: 44px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; margin: 6px 0 4px; }
+    .today-row { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; }
+    .today-row div span { display: block; font-size: 12px; color: var(--muted); }
+    .today-row div strong { font-size: 17px; font-weight: 600; }
+
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+    .stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 6px; }
+    .stat-foot { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+    .duo { display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; margin-bottom: 18px; }
+    .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+    .cal-dow { font-size: 11px; color: var(--faint); text-align: center; padding-bottom: 2px; }
+    .cal-day { aspect-ratio: 1; border-radius: 10px; background: var(--gray-soft); display: flex; flex-direction: column; justify-content: space-between; padding: 6px; font-size: 11px; color: var(--muted); min-width: 0; cursor: default; transition: transform 0.2s; }
+    .cal-day.has { cursor: pointer; } .cal-day.has:hover { transform: scale(1.05); }
+    .cal-day.pos { background: var(--green-soft); color: var(--green); }
+    .cal-day.neg { background: var(--red-soft); color: var(--red); }
+    .cal-day.blank { background: none; }
+    .cal-day b { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chart-wrap { position: relative; height: 220px; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .empty { padding: 30px 10px; text-align: center; color: var(--muted); font-size: 14px; }
+
+    .day { border-top: 1px solid var(--line); }
+    .day:first-child { border-top: 0; }
+    .day summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 24px; gap: 10px; align-items: center; padding: 14px 4px; }
+    .day summary::-webkit-details-marker { display: none; }
+    .day summary:hover { background: var(--gray-soft); border-radius: 12px; }
+    .day-date strong { display: block; font-weight: 600; }
+    .day-date span, .day-cell span { font-size: 12px; color: var(--muted); display: block; }
+    .day-cell strong { font-weight: 600; }
+    .chev { width: 16px; height: 16px; color: var(--faint); transition: transform 0.25s; }
+    .day[open] .chev { transform: rotate(90deg); }
+    .day-body { padding: 4px 4px 18px; animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .ai-line { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th { text-align: left; font-weight: 500; font-size: 12px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    td.reason { color: var(--muted); min-width: 220px; }
+    .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--gray-soft); color: var(--muted); white-space: nowrap; }
+    .pill.green { background: var(--green-soft); color: var(--green); }
+    .pill.red { background: var(--red-soft); color: var(--red); }
+    footer { text-align: center; color: var(--faint); font-size: 12px; margin-top: 28px; }
+
+    @media (max-width: 860px) {
+      .today, .duo { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      h1 { font-size: 28px; }
+      .day summary { grid-template-columns: 1.15fr 0.85fr 1fr 16px; gap: 8px; }
+      .day-cell strong { white-space: nowrap; }
+      .day summary .hide-sm { display: none; }
+      .cal-day { padding: 4px 5px; border-radius: 8px; }
+      .cal-day b { font-size: 10px; }
+    }
+    @media (max-width: 420px) { .brand-text { display: none; } .today-main .big { font-size: 36px; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .reveal { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="brand"><span class="brand-mark"></span><span class="brand-text">Gold Desk</span></div>
+      <div class="nav-spacer"></div>
+      <a class="nav-link" href="/dashboard">Dashboard</a>
+      <a class="nav-link active" href="/journal">Journal</a>
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="สลับธีม">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <main>
+    <div class="head reveal">
+      <div><h1>Trading Journal</h1><div class="sub">ไม้จริงที่ปิดแล้วใน MT5 แยกตามวัน (เวลา server ของโบรกเกอร์)</div></div>
+      <div class="segmented" id="range">
+        <button type="button" data-days="7">7 วัน</button>
+        <button type="button" data-days="30" class="active">30 วัน</button>
+        <button type="button" data-days="365">ทั้งหมด</button>
+      </div>
+    </div>
+
+    <div class="banner reveal" id="gate" hidden><span class="dot"></span><div><strong id="gateTitle"></strong><span id="gateBody"></span></div></div>
+
+    <section class="today">
+      <div class="card today-main reveal" style="animation-delay: 0.05s">
+        <h2 class="card-title" id="todayLabel">วันนี้</h2>
+        <div class="big num" id="todayNet">—</div>
+        <div class="sub" id="todaySub">ยังไม่มีไม้ที่ปิดวันนี้</div>
+        <div class="today-row">
+          <div><span>ไม้</span><strong class="num" id="todayCount">0</strong></div>
+          <div><span>ชนะ / แพ้</span><strong class="num" id="todayWL">0 / 0</strong></div>
+          <div><span>รวม R</span><strong class="num" id="todayR">—</strong></div>
+          <div><span>AI อนุมัติ / ปฏิเสธ</span><strong class="num" id="todayAI">0 / 0</strong></div>
+        </div>
+      </div>
+      <div class="card reveal" style="animation-delay: 0.1s">
+        <div class="card-head"><h2 class="card-title">กำไรสะสม</h2><span class="sub num" id="cumNow">—</span></div>
+        <div class="chart-wrap" style="height: 160px"><canvas id="cum"></canvas></div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="card reveal" style="animation-delay: 0.14s"><h2 class="card-title">กำไร/ขาดทุนสุทธิ</h2><div class="stat-value num" id="sNet">—</div><div class="stat-foot num" id="sNetFoot">—</div></div>
+      <div class="card reveal" style="animation-delay: 0.18s"><h2 class="card-title">อัตราชนะ</h2><div class="stat-value num" id="sWin">—</div><div class="stat-foot num" id="sWinFoot">—</div></div>
+      <div class="card reveal" style="animation-delay: 0.22s"><h2 class="card-title">วันที่ดีที่สุด</h2><div class="stat-value num up" id="sBest">—</div><div class="stat-foot num" id="sBestFoot">—</div></div>
+      <div class="card reveal" style="animation-delay: 0.26s"><h2 class="card-title">วันที่แย่ที่สุด</h2><div class="stat-value num down" id="sWorst">—</div><div class="stat-foot num" id="sWorstFoot">—</div></div>
+    </section>
+
+    <section class="duo">
+      <div class="card reveal" style="animation-delay: 0.3s">
+        <div class="card-head"><h2 class="card-title">ปฏิทิน 5 สัปดาห์</h2><span class="sub">แตะวันที่มีไม้เพื่อดูรายละเอียด</span></div>
+        <div class="cal-week" id="calendar"></div>
+      </div>
+      <div class="card reveal" style="animation-delay: 0.34s">
+        <div class="card-head"><h2 class="card-title">กำไร/ขาดทุนรายวัน (USD)</h2></div>
+        <div class="chart-wrap"><canvas id="bars"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card reveal" style="animation-delay: 0.38s">
+      <div class="card-head"><h2 class="card-title">บันทึกรายวัน</h2><span class="sub" id="dayCount">—</span></div>
+      <div id="days"><div class="empty">กำลังโหลด…</div></div>
+    </section>
+
+    <footer>ข้อมูลจากบัญชี MT5 ผ่าน EA · ผลจำลอง (กระดาษ) ไม่นับรวมในกำไร/ขาดทุน · ผลในอดีตไม่รับประกันอนาคต</footer>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmt = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+    const signed = (v, d = 2, unit = '') => (typeof v === 'number' && isFinite(v)) ? `${v > 0 ? '+' : ''}${fmt(v, d)}${unit}` : '—';
+    const money = (v) => (typeof v === 'number' && isFinite(v)) ? `${v < 0 ? '−' : v > 0 ? '+' : ''}$${fmt(Math.abs(v))}` : '—';
+    const tone = (v) => v > 0 ? 'up' : v < 0 ? 'down' : '';
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const TH_DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+
+    // "2026.11.03" -> Date at UTC midnight (server day, no local shift)
+    const toDate = (day) => { const [y, m, d] = day.split('.').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+    const dayKey = (dt) => `${dt.getUTCFullYear()}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.${String(dt.getUTCDate()).padStart(2, '0')}`;
+    const thDate = (day) => { const dt = toDate(day); return `${TH_DOW[dt.getUTCDay()]} ${dt.getUTCDate()} ${TH_MONTH[dt.getUTCMonth()]}`; };
+
+    let all = [], gate = null, rangeDays = 30;
+    try { rangeDays = Number(localStorage.getItem('gd-journal-range')) || 30; } catch (e) {}
+
+    function applyTheme(theme) {
+      if (theme) document.documentElement.setAttribute('data-theme', theme);
+      else document.documentElement.removeAttribute('data-theme');
+      render();
+    }
+    try { const t = localStorage.getItem('gd-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    $('themeBtn').addEventListener('click', () => {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+      const next = dark ? 'light' : 'dark';
+      applyTheme(next);
+      try { localStorage.setItem('gd-theme', next); } catch (e) {}
+    });
+
+    document.querySelectorAll('#range button').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.days) === rangeDays);
+      btn.addEventListener('click', () => {
+        rangeDays = Number(btn.dataset.days);
+        document.querySelectorAll('#range button').forEach((b) => b.classList.toggle('active', b === btn));
+        try { localStorage.setItem('gd-journal-range', String(rangeDays)); } catch (e) {}
+        render();
+      });
+    });
+
+    // The newest day in the data (or today, if the bot is idle) anchors the range.
+    function latestDay() {
+      const now = new Date();
+      const today = dayKey(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+      return all.length && all[0].day > today ? all[0].day : today;
+    }
+
+    function inRange() {
+      const end = toDate(latestDay());
+      const start = new Date(end.getTime() - (rangeDays - 1) * 86400000);
+      return all.filter((d) => toDate(d.day) >= start);
+    }
+
+    function renderGate() {
+      const box = $('gate');
+      if (!gate || !gate.enabled) { box.hidden = true; return; }
+      box.hidden = false;
+      box.classList.toggle('ok', gate.open);
+      const avg = gate.expectancy_r == null ? 'ยังไม่มีผล' : `เฉลี่ย ${signed(gate.expectancy_r, 2, 'R')} ต่อไม้`;
+      if (gate.open) {
+        $('gateTitle').textContent = 'เทรดจริงอยู่';
+        $('gateBody').textContent = `${gate.window} ไม้ล่าสุดที่ AI อนุมัติ ${avg} ผ่านเกณฑ์ ${signed(gate.min_expectancy_r, 2, 'R')}`;
+      } else {
+        $('gateTitle').textContent = 'พักเทรดจริง: บันทึกเป็นไม้กระดาษ';
+        $('gateBody').textContent = `ไม้ที่ AI อนุมัติ ${gate.n}/${gate.window} ไม้ล่าสุด ${avg} · จะกลับมาเทรดจริงเมื่อครบ ${gate.window} ไม้และเฉลี่ย ≥ ${signed(gate.min_expectancy_r, 2, 'R')}`;
+      }
+    }
+
+    function renderToday() {
+      const key = latestDay();
+      const d = all.find((x) => x.day === key);
+      $('todayLabel').textContent = `วันนี้ · ${thDate(key)}`;
+      const net = d ? d.net_usd : 0;
+      const el = $('todayNet');
+      el.textContent = d && d.count ? money(net) : '$0.00';
+      el.className = `big num ${tone(net)}`;
+      $('todaySub').textContent = !d || !d.count ? 'ยังไม่มีไม้ที่ปิดวันนี้' : net >= 0 ? 'วันนี้กำไร' : 'วันนี้ขาดทุน';
+      $('todayCount').textContent = d ? d.count : 0;
+      $('todayWL').textContent = d ? `${d.wins} / ${d.losses}` : '0 / 0';
+      $('todayR').textContent = d && d.count ? signed(d.net_r, 2, 'R') : '—';
+      $('todayR').className = `num ${tone(d ? d.net_r : 0)}`;
+      $('todayAI').textContent = d ? `${d.approved} / ${d.rejected}` : '0 / 0';
+    }
+
+    function renderStats(rows) {
+      const traded = rows.filter((d) => d.count);
+      const n = traded.reduce((s, d) => s + d.count, 0);
+      const wins = traded.reduce((s, d) => s + d.wins, 0);
+      const net = traded.reduce((s, d) => s + d.net_usd, 0);
+      const netR = traded.reduce((s, d) => s + d.net_r, 0);
+      $('sNet').textContent = n ? money(net) : '—';
+      $('sNet').className = `stat-value num ${tone(net)}`;
+      $('sNetFoot').textContent = n ? `${n} ไม้ · ${signed(netR, 2, 'R')} · ${traded.length} วันที่เทรด` : 'ยังไม่มีไม้ในช่วงนี้';
+      $('sWin').textContent = n ? `${fmt(wins / n * 100, 0)}%` : '—';
+      $('sWinFoot').textContent = n ? `ชนะ ${wins} · แพ้ ${n - wins}` : '—';
+      const sorted = [...traded].sort((a, b) => b.net_usd - a.net_usd);
+      const best = sorted[0], worst = sorted[sorted.length - 1];
+      $('sBest').textContent = best && best.net_usd > 0 ? money(best.net_usd) : '—';
+      $('sBestFoot').textContent = best && best.net_usd > 0 ? thDate(best.day) : 'ยังไม่มีวันกำไร';
+      $('sWorst').textContent = worst && worst.net_usd < 0 ? money(worst.net_usd) : '—';
+      $('sWorstFoot').textContent = worst && worst.net_usd < 0 ? thDate(worst.day) : 'ยังไม่มีวันขาดทุน';
+    }
+
+    function renderCalendar() {
+      const byDay = Object.fromEntries(all.map((d) => [d.day, d]));
+      const end = toDate(latestDay());
+      const start = new Date(end.getTime() - (34 - (6 - end.getUTCDay())) * 86400000);
+      let html = TH_DOW.map((d) => `<div class="cal-dow">${d}</div>`).join('');
+      for (let i = 0; i < 35; i++) {
+        const dt = new Date(start.getTime() + i * 86400000);
+        if (dt > end) { html += '<div class="cal-day blank"></div>'; continue; }
+        const key = dayKey(dt), d = byDay[key];
+        const cls = d && d.count ? (d.net_usd > 0 ? 'pos has' : d.net_usd < 0 ? 'neg has' : 'has') : '';
+        html += `<div class="cal-day ${cls}" data-day="${key}" title="${esc(thDate(key))}">
+          <span>${dt.getUTCDate()}</span>${d && d.count ? `<b class="num" title="${esc(money(d.net_usd))}">${d.net_usd < 0 ? '−' : ''}$${Math.round(Math.abs(d.net_usd))}</b>` : ''}</div>`;
+      }
+      $('calendar').innerHTML = html;
+      $('calendar').querySelectorAll('.cal-day.has').forEach((cell) => cell.addEventListener('click', () => {
+        const target = document.querySelector(`details[data-day="${cell.dataset.day}"]`);
+        if (!target) return;
+        target.open = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }));
+    }
+
+    function setupCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      return [ctx, w, h];
+    }
+
+    function drawBars(rows) {
+      const [ctx, w, h] = setupCanvas($('bars'));
+      const data = rows.filter((d) => d.count).reverse();
+      ctx.font = '11px Inter, sans-serif';
+      if (!data.length) { ctx.fillStyle = css('--muted'); ctx.textAlign = 'center'; ctx.fillText('ยังไม่มีไม้ในช่วงนี้', w / 2, h / 2); return; }
+      const pad = { l: 44, r: 8, t: 10, b: 22 };
+      const max = Math.max(1, ...data.map((d) => Math.abs(d.net_usd)));
+      const zero = pad.t + (h - pad.t - pad.b) / 2;
+      const scale = (h - pad.t - pad.b) / 2 / max;
+      ctx.strokeStyle = css('--chart-grid'); ctx.fillStyle = css('--faint'); ctx.textAlign = 'right';
+      [max, 0, -max].forEach((v) => {
+        const y = zero - v * scale;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+        ctx.fillText(`${v < 0 ? '−' : ''}$${fmt(Math.abs(v), 0)}`, pad.l - 6, y + 4);
+      });
+      const slot = (w - pad.l - pad.r) / data.length;
+      const bw = Math.min(28, slot * 0.6);
+      ctx.textAlign = 'center';
+      data.forEach((d, i) => {
+        const x = pad.l + slot * i + slot / 2;
+        const y = zero - d.net_usd * scale;
+        ctx.fillStyle = d.net_usd >= 0 ? css('--green') : css('--red');
+        const top = Math.min(y, zero), hh = Math.max(2, Math.abs(y - zero));
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - bw / 2, top, bw, hh, 4) : ctx.rect(x - bw / 2, top, bw, hh); ctx.fill();
+        if (data.length <= 14 || i % Math.ceil(data.length / 10) === 0) {
+          ctx.fillStyle = css('--faint');
+          ctx.fillText(String(toDate(d.day).getUTCDate()), x, h - 6);
+        }
+      });
+    }
+
+    function drawCum() {
+      const [ctx, w, h] = setupCanvas($('cum'));
+      const data = all.filter((d) => d.count).slice().reverse();
+      const last = data.length ? data[data.length - 1].cum_usd : null;
+      $('cumNow').textContent = last == null ? '—' : money(last);
+      $('cumNow').className = `sub num ${tone(last)}`;
+      if (data.length < 2) { ctx.font = '12px Inter, sans-serif'; ctx.fillStyle = css('--muted'); ctx.textAlign = 'center'; ctx.fillText('ต้องมีอย่างน้อย 2 วันที่เทรด', w / 2, h / 2); return; }
+      const pts = [0, ...data.map((d) => d.cum_usd)];
+      const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+      const X = (i) => 6 + (w - 12) * i / (pts.length - 1);
+      const Y = (v) => 8 + (h - 16) * (1 - (v - lo) / span);
+      const color = last >= 0 ? css('--green') : css('--red');
+      ctx.strokeStyle = css('--chart-grid'); ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(w, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
+      ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+      ctx.lineTo(X(pts.length - 1), h); ctx.lineTo(X(0), h); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath(); pts.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+    }
+
+    function renderDays(rows) {
+      $('dayCount').textContent = `${rows.filter((d) => d.count).length} วันที่มีไม้ · ${rows.length} วันที่บอททำงาน`;
+      if (!rows.length) { $('days').innerHTML = '<div class="empty">ยังไม่มีข้อมูลในช่วงนี้</div>'; return; }
+      $('days').innerHTML = rows.map((d) => {
+        const trades = d.trades.slice().reverse().map((t) => `<tr>
+            <td class="num">${esc(String(t.close_time).slice(11))}</td>
+            <td><span class="pill ${t.direction === 'BUY' ? 'green' : 'red'}">${esc(t.direction)}</span></td>
+            <td>${esc(t.setup || '—')}</td>
+            <td class="num">${fmt(t.entry_price)} → ${fmt(t.close_price)}</td>
+            <td class="num ${tone(t.pnl_usd)}"><b>${esc(money(t.pnl_usd))}</b></td>
+            <td class="num ${tone(t.pnl_r)}">${esc(signed(t.pnl_r, 2, 'R'))}</td>
+            <td class="reason">${esc(t.ai_reason || '')}</td></tr>`).join('');
+        const ai = d.approved + d.rejected + d.unavailable
+          ? `AI ตรวจ setup ${d.approved + d.rejected + d.unavailable} ครั้ง: อนุมัติ ${d.approved} · ปฏิเสธ ${d.rejected}${d.unavailable ? ` · ไม่พร้อม ${d.unavailable}` : ''} · ผลไม้ที่อนุมัติ (รวมกระดาษ) ${signed(d.approved_paper_r, 2, 'R')}`
+          : 'วันนี้ไม่มี setup ให้ AI ตรวจ';
+        return `<details class="day" data-day="${esc(d.day)}">
+          <summary>
+            <div class="day-date"><strong>${esc(thDate(d.day))}</strong><span class="num">${esc(d.day)}</span></div>
+            <div class="day-cell"><strong class="num">${d.count} ไม้</strong><span class="num">ชนะ ${d.wins} · แพ้ ${d.losses}</span></div>
+            <div class="day-cell"><strong class="num ${tone(d.net_usd)}">${d.count ? esc(money(d.net_usd)) : '—'}</strong><span class="num">${d.count ? esc(signed(d.net_r, 2, 'R')) : 'ไม่มีไม้จริง'}</span></div>
+            <div class="day-cell hide-sm"><strong class="num">${esc(money(d.cum_usd))}</strong><span>สะสม</span></div>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </summary>
+          <div class="day-body">
+            <p class="ai-line">${esc(ai)}</p>
+            ${d.count ? `<div class="table-wrap"><table>
+              <thead><tr><th>ปิด</th><th>ฝั่ง</th><th>Setup</th><th>เข้า → ออก</th><th>P&amp;L</th><th>R</th><th>เหตุผล AI ตอนเข้า</th></tr></thead>
+              <tbody>${trades}</tbody></table></div>` : ''}
+          </div></details>`;
+      }).join('');
+    }
+
+    function render() {
+      if (!all) return;
+      const rows = inRange();
+      renderGate(); renderToday(); renderStats(rows); renderCalendar(); drawBars(rows); drawCum(); renderDays(rows);
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/journal?days=365', { cache: 'no-store' });
+        const data = await res.json();
+        const open = new Set([...document.querySelectorAll('details.day[open]')].map((el) => el.dataset.day));
+        all = data.days || []; gate = data.live_gate || null;
+        render();
+        open.forEach((day) => { const el = document.querySelector(`details[data-day="${day}"]`); if (el) el.open = true; });
+      } catch (e) {
+        $('days').innerHTML = '<div class="empty">เชื่อมต่อ service ไม่ได้</div>';
+      }
+    }
+    let resizeTimer;
+    window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+    load();
+    setInterval(load, 30000);
+  </script>
+</body>
+</html>

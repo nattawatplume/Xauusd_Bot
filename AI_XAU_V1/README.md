@@ -5,6 +5,7 @@ This folder is a separate prototype. The existing root-level `XAU_Pro_EA.mq5` an
 ## What the AI receives and decides
 
 - Eight closed M5 candles, M5 RSI/EMA/ATR, M15 EMA/ADX/ATR, bid/ask/spread, account equity/balance, EA position state, and upcoming high-impact USD events from the MT5 economic calendar.
+- The updated EA also sends up to 60 closed M5 candles, broker-confirmed EA positions, account currency, and terminal permissions for the Cloud dashboard. Those dashboard-only fields are excluded from the Ollama model prompt. The local Ollama service is separate from `cloud_ai_trader` and does not host its dashboard.
 - Recent headline metadata from the public GDELT DOC search endpoint. This is a convenience feed without a trading-service uptime guarantee; the headline list can be empty or stale.
 - A structured decision: `BUY`, `SELL`, `NO_TRADE`, or `EXIT`; setup (`pullback`, `breakout`, `range_reversal`); market regime; confidence; stop distance in ATR; target in R; and a short reason.
 - `EXIT` is only accepted for this EA's position. The EA rejects stale bar responses, low confidence, invalid actions, and stop/target values outside configured bounds.
@@ -44,7 +45,7 @@ AI confidence is only the model's self-assessed score; it is **not** a measured 
    The service binds only to `127.0.0.1`; do not expose it to the internet. Check `http://127.0.0.1:8765/health` in a browser. It should report `status: ok` and the configured model.
 
 5. In MT5, open **File → Open Data Folder → MQL5 → Experts**, copy `MQL5\Experts\XAU_AI_Trader.mq5` there, then open it in MetaEditor and press **F7**. Confirm MetaEditor reports `0 errors`.
-6. In MT5, open **Tools → Options → Expert Advisors**, enable **Allow WebRequest for listed URL**, and add `http://127.0.0.1:8765`. Attach `XAU_AI_Trader` to one **XAUUSD M5** demo chart. In EA Inputs, set `AIBridgeToken` to the same token from `.env`. Keep `AIShadowMode=true` and `AIEnableTrading=false` for the first observation period. Enable `Algo Trading`.
+6. In MT5, open **Tools → Options → Expert Advisors**, enable **Allow WebRequest for listed URL**, and add `http://127.0.0.1:8765`. Attach `XAU_AI_Trader` to one **XAUUSD M5** demo chart. In EA Inputs, set `AIBridgeURL` to `http://127.0.0.1:8765/v1/decision` (the EA default, port 8766, points at `cloud_ai_trader`) and `AIBridgeToken` to the same token from `.env`. Keep `AIShadowMode=true` and `AIEnableTrading=false` for the first observation period. Enable `Algo Trading`.
 7. Review the MT5 **Experts/Journal** tab and `service\runtime\decisions.jsonl`. Confirm the bridge is reachable, bar timestamps match, news status is present, and decisions make sense. A response timeout/invalid response should result in no order.
 8. Only after reviewing a substantial shadow sample and independently validating the trading rules should you consider setting `AIShadowMode=false` and `AIEnableTrading=true` on a demo account. Do not use a real account based only on a short sample.
 

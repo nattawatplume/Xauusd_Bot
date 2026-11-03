@@ -13,6 +13,7 @@ from brain.llm_client import LLMClient
 from brain.market_analyzer import MarketAnalyzer
 from brain.memory import Memory
 from brain.reflection_engine import ReflectionEngine
+from brain.shadow_tracker import ShadowTracker, build_plan
 
 log = logging.getLogger("ai_trader.brain")
 
@@ -26,6 +27,11 @@ class AIBrain:
         self.analyzer = MarketAnalyzer(self.llm, self.memory)
         self.decision_engine = DecisionEngine(self.llm, self.memory)
         self.reflection_engine = ReflectionEngine(self.llm, self.memory)
+        self.shadow = ShadowTracker()
+        # Latest deterministic context and last AI-approved entry, for the dashboard
+        # and for tagging the broker-confirmed trade that follows an approval.
+        self.latest_context: dict[str, Any] | None = None
+        self.last_approved: dict[str, Any] | None = None
 
         # In-memory deduplication cache for bar decisions
         self._last_decisions: dict[str, dict[str, Any]] = {}
@@ -44,6 +50,7 @@ class AIBrain:
 
         # 1. OBSERVE & THINK: Analyze market context
         market_context = await self.analyzer.analyze(snapshot)
+        self.latest_context = {"bar_time": bar_time, **market_context}
 
         # 2. Extract account state
         account_state = {
@@ -67,11 +74,28 @@ class AIBrain:
         if settings.SHADOW_MODE:
             decision["reason"] = f"[SHADOW MODE] {decision['reason']}"
 
-        # 4. Record decision in memory & database
+        # The plan is built from the AI's answer before the live gate can change it,
+        # so paper approvals keep being scored like real ones.
+        plan: dict[str, Any] = {}
         try:
-            await self.memory.log_decision(decision)
+            plan = build_plan(snapshot, decision, market_context.get("technical_candidates") or [])
+        except Exception as e:
+            log.error("Failed to build shadow plan: %s", e)
+
+        if decision["action"] in {"BUY", "SELL"}:
+            gate = await self.shadow.gate_status()
+            if not gate["open"]:
+                decision["reason"] = f"[PAPER] {gate['reason']} AI: {decision['reason']}"
+                decision["action"] = "NO_TRADE"
+                decision["rejection_reason"] = "live_gate"
+
+        # 4. Record decision (with a shadow-scoring plan for candidate bars)
+        try:
+            await self.memory.log_decision({**decision, "shadow_plan": plan})
         except Exception as e:
             log.error("Failed to log decision to DB: %s", e)
+        if decision["action"] in {"BUY", "SELL"}:
+            self.last_approved = dict(decision)
 
         # Cache decision
         self._last_decisions[cache_key] = decision
@@ -89,14 +113,10 @@ class AIBrain:
         )
         return decision
 
-    async def process_trade_closed(self, trade_result: dict[str, Any]) -> dict[str, Any]:
-        """Core cycle: REFLECT -> LEARN."""
-        log.info("Processing closed trade ticket #%s", trade_result.get("ticket"))
-
-        # Update trade record in DB
-        trade = await self.memory.log_trade_closed(trade_result)
-        # Memory returns a plain dict, including a synthetic record when the
-        # EA reports a close for a trade whose open event was not recorded.
+    async def process_trade_closed(self, trade_result: dict[str, Any], trade: dict[str, Any]) -> dict[str, Any]:
+        """Core cycle: REFLECT -> LEARN, for a trade already closed in the ledger."""
+        log.info("Reflecting on closed position #%s", trade_result.get("ticket"))
+        trade_result["pnl_r"] = trade.get("pnl_r")
         trade_id = int(trade.get("id", 0)) if trade else 0
         trade_result["trade_id"] = trade_id
 

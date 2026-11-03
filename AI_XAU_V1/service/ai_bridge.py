@@ -153,8 +153,13 @@ def call_ollama(snapshot: dict[str, Any], news: dict[str, Any]) -> dict[str, Any
         {"title": item["title"], "domain": item["domain"], "published": item["published"], "url": item["url"]}
         for item in headlines
     ]
+    dashboard_fields = {
+        "chart_candles_m5", "open_positions", "account_currency", "ai_enabled", "ai_shadow",
+        "legacy_signal_fallback", "terminal_connected", "terminal_trade_allowed", "ea_trade_allowed",
+    }
+    model_snapshot = {key: value for key, value in snapshot.items() if key not in dashboard_fields}
     prompt_data = {
-        "market_snapshot": snapshot,
+        "market_snapshot": model_snapshot,
         "news_feed_status": news.get("status", "unavailable"),
         "news_fetched_at_utc": news.get("fetched_at"),
         "headlines": headlines_context,

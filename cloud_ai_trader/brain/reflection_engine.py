@@ -58,7 +58,7 @@ class ReflectionEngine:
 
         # Append key lesson to market insights
         lesson = ai_reflection.get("key_lesson")
-        if lesson and len(lesson) > 10:
+        if lesson and len(lesson) > 10 and not ai_reflection.get("_llm_error"):
             insights = self.memory.get_market_insights()
             updated_insights = f"{insights}\n- [{trade_result.get('close_time', 'Recently')}] {lesson}"
             await self.memory.update_market_insights(

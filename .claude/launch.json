@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cloud-ai-trader-preview",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "$env:PORT='8767'; python cloud_ai_trader/main.py"],
+      "port": 8767
+    }
+  ]
+}

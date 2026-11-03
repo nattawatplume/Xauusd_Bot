@@ -13,6 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY . .
 
-EXPOSE 8765
+EXPOSE 8766
 
 CMD ["python", "main.py"]

@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     ports:
       # Keep the bridge private on the VPS. Expose it through a configured TLS proxy if needed.
-      - "127.0.0.1:8765:8765"
+      - "127.0.0.1:8766:8766"
     env_file:
       - .env
     volumes:
