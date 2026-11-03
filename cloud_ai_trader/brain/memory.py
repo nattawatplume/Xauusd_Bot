@@ -139,6 +139,70 @@ class Memory:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _insert)
 
+    async def mark_executed(self, bar_time: str) -> None:
+        """Flag the approved decision behind a broker-confirmed entry as a real trade."""
+        def _update() -> None:
+            with get_db_connection() as conn:
+                conn.execute(
+                    "UPDATE decisions SET was_executed = 1 WHERE id = "
+                    "(SELECT MAX(id) FROM decisions WHERE bar_time = ? AND ai_verdict = 'approved')",
+                    (bar_time,),
+                )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _update)
+
+    async def get_journal(self, days: int = 60) -> list[dict[str, Any]]:
+        """Closed trades and AI activity grouped by broker-server day, newest first."""
+        def _fetch() -> list[dict[str, Any]]:
+            with get_db_connection() as conn:
+                trades = [dict(r) for r in conn.execute(
+                    "SELECT ticket, direction, setup, entry_price, close_price, lot_size, pnl_usd, pnl_r, "
+                    "open_time, close_time, hold_bars, ai_reason FROM trades "
+                    "WHERE status = 'closed' AND close_time IS NOT NULL ORDER BY close_time"
+                ).fetchall()]
+                activity = conn.execute(
+                    "SELECT substr(bar_time, 1, 10) AS day, ai_verdict, COUNT(*) AS n, "
+                    "SUM(CASE WHEN outcome IN ('win', 'loss', 'timeout') THEN outcome_r END) AS paper_r "
+                    "FROM decisions WHERE ai_verdict IN ('approved', 'rejected', 'unavailable') "
+                    "GROUP BY day, ai_verdict"
+                ).fetchall()
+
+            by_day: dict[str, dict[str, Any]] = {}
+
+            def day_row(day: str) -> dict[str, Any]:
+                return by_day.setdefault(day, {
+                    "day": day, "trades": [], "count": 0, "wins": 0, "losses": 0, "net_usd": 0.0, "net_r": 0.0,
+                    "approved": 0, "rejected": 0, "unavailable": 0, "approved_paper_r": 0.0,
+                })
+
+            for t in trades:
+                d = day_row(str(t["close_time"])[:10])
+                pnl = t["pnl_usd"] or 0.0
+                d["trades"].append(t)
+                d["count"] += 1
+                d["wins"] += 1 if pnl > 0 else 0
+                d["losses"] += 1 if pnl < 0 else 0
+                d["net_usd"] += pnl
+                d["net_r"] += t["pnl_r"] or 0.0
+            for a in activity:
+                d = day_row(a["day"])
+                d[a["ai_verdict"]] = a["n"]
+                if a["ai_verdict"] == "approved":
+                    d["approved_paper_r"] = a["paper_r"] or 0.0
+
+            rows = sorted(by_day.values(), key=lambda d: d["day"])
+            running = 0.0
+            for d in rows:
+                running += d["net_usd"]
+                d["cum_usd"] = round(running, 2)
+                for k in ("net_usd", "net_r", "approved_paper_r"):
+                    d[k] = round(d[k], 2)
+            return list(reversed(rows))[:days]
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _fetch)
+
     async def log_trade_opened(self, trade_data: dict[str, Any]) -> int:
         """Record a broker-confirmed entry. The ticket is the MT5 position id."""
         def _upsert() -> int:

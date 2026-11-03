@@ -73,6 +73,8 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(180, 130, 0, 0.35);
     }
     .nav-spacer { flex: 1; }
+    .nav-link { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 999px; transition: background 0.2s, color 0.2s; }
+    .nav-link:hover { background: var(--gray-soft); color: var(--text); }
     .live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); position: relative; flex: none; }
     .dot.on { background: var(--green); }
@@ -240,6 +242,7 @@
       <div class="brand"><span class="brand-mark"></span>Gold Desk</div>
       <span class="pill" id="modePill">กำลังเชื่อมต่อ</span>
       <div class="nav-spacer"></div>
+      <a class="nav-link" href="/journal">Journal</a>
       <div class="live"><span class="dot" id="liveDot"></span><span class="live-text" id="liveText">กำลังเชื่อมต่อ…</span></div>
       <button class="icon-btn" id="themeBtn" type="button" aria-label="สลับธีม">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -350,7 +353,7 @@
       </div>
       <div class="tab active" id="tabDecisions">
         <div class="table-wrap"><table>
-          <thead><tr><th>แท่ง</th><th>คำตอบ</th><th>Setup</th><th>AI</th><th>ผล shadow</th><th>เหตุผล</th></tr></thead>
+          <thead><tr><th>แท่ง</th><th>คำตอบ</th><th>Setup</th><th>AI</th><th title="ผลสมมติ: ถ้าเข้าไม้นี้จะได้เท่าไร ไม่ใช่ไม้ที่เปิดจริง">ผลจำลอง (ถ้าเข้า)</th><th>เหตุผล</th></tr></thead>
           <tbody id="decisionRows"><tr><td colspan="6" class="empty">ยังไม่มีการตัดสินใจ</td></tr></tbody>
         </table></div>
       </div>
@@ -561,6 +564,15 @@
       return ['โควตา Gemini', both ? false : null, note];
     }
 
+    function gateItem(g) {
+      if (!g) return ['ด่านเทรดจริง', null, 'รอข้อมูล'];
+      if (!g.enabled) return ['ด่านเทรดจริง', null, 'ปิดอยู่: ไม้ที่ AI อนุมัติเข้าจริงทุกไม้'];
+      const avg = g.expectancy_r == null ? '' : ` · เฉลี่ย ${signed(g.expectancy_r, 2, 'R')}`;
+      return g.open
+        ? ['ด่านเทรดจริง', true, `เปิด: ${g.window} ไม้ล่าสุดที่ AI อนุมัติ${avg}`]
+        : ['ด่านเทรดจริง', null, `เทรดกระดาษ: ${g.n}/${g.window} ไม้${avg} (ต้อง ≥ ${signed(g.min_expectancy_r, 2, 'R')})`];
+    }
+
     function renderChecklist(o) {
       const m = o.market || {}, h = o.health || {};
       const age = ageMin(m.market_received_at);
@@ -569,6 +581,7 @@
         ['Cloud service', h.status === 'online', h.status === 'online' ? `${h.model} · สำรอง ${h.fallback_model}` : 'ไม่ตอบสนอง'],
         ['Gemini API key', h.gemini_api_configured, h.gemini_api_configured ? 'ตั้งค่าแล้ว' : 'ใส่ GEMINI_API_KEY ใน .env'],
         quotaItem(h),
+        gateItem(o.live_gate),
         ['ข้อมูลจาก EA', age != null && age < 7, age == null ? 'ยังไม่เคยได้รับ snapshot' : `ล่าสุด ${Math.round(age)} นาทีก่อน`],
         ['MT5 เชื่อมต่อโบรกเกอร์', m.terminal_connected, m.terminal_connected == null ? 'รอข้อมูล' : m.terminal_connected ? 'เชื่อมต่อแล้ว' : 'ขาดการเชื่อมต่อ'],
         ['Algo Trading ใน MT5', algo, algo == null ? 'รอข้อมูล' : algo ? 'อนุญาต' : 'ปิดอยู่ — กดปุ่ม Algo Trading ใน MT5'],
@@ -605,7 +618,7 @@
         return `<tr><td class="num">${esc(d.bar_time)}</td><td class="${act}"><b>${esc(ACTION_TH[d.action] || d.action)}</b></td>
           <td>${esc(d.candidate_side ? `${d.candidate_side} ${d.candidate_setup || ''}` : '—')}</td>
           <td>${d.ai_verdict ? `<span class="pill ${vKind}">${esc(vText)}</span>` : '—'}</td>
-          <td>${d.outcome ? `<span class="pill ${oKind}">${esc(oText)}${esc(r)}</span>` : '—'}</td>
+          <td>${d.outcome ? `<span class="pill ${oKind}" title="${d.was_executed ? 'ไม้จริง' : 'จำลอง: ไม่ได้เปิดออเดอร์จริง'}">${d.was_executed ? 'จริง · ' : 'จำลอง · '}${esc(oText)}${esc(r)}</span>` : '—'}</td>
           <td class="reason-cell">${esc((d.reason || '').replace(/^\[SHADOW MODE\]\s*/, ''))}</td></tr>`;
       }).join('') : '<tr><td colspan="6" class="empty">ยังไม่มีการตัดสินใจ</td></tr>';
 

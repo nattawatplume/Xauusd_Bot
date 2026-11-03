@@ -74,9 +74,23 @@ class AIBrain:
         if settings.SHADOW_MODE:
             decision["reason"] = f"[SHADOW MODE] {decision['reason']}"
 
-        # 4. Record decision (with a shadow-scoring plan for candidate bars)
+        # The plan is built from the AI's answer before the live gate can change it,
+        # so paper approvals keep being scored like real ones.
+        plan: dict[str, Any] = {}
         try:
             plan = build_plan(snapshot, decision, market_context.get("technical_candidates") or [])
+        except Exception as e:
+            log.error("Failed to build shadow plan: %s", e)
+
+        if decision["action"] in {"BUY", "SELL"}:
+            gate = await self.shadow.gate_status()
+            if not gate["open"]:
+                decision["reason"] = f"[PAPER] {gate['reason']} AI: {decision['reason']}"
+                decision["action"] = "NO_TRADE"
+                decision["rejection_reason"] = "live_gate"
+
+        # 4. Record decision (with a shadow-scoring plan for candidate bars)
+        try:
             await self.memory.log_decision({**decision, "shadow_plan": plan})
         except Exception as e:
             log.error("Failed to log decision to DB: %s", e)

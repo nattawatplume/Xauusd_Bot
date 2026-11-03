@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     SHADOW_MIN_RISK_ATR: float = 1.0  # mirrors the EA MinRiskATR input
     SHADOW_MAX_HOLD_BARS: int = 12    # mirrors the EA MaxHoldBars input
 
+    # Live gate: AI-approved entries reach the broker only while the last
+    # LIVE_GATE_WINDOW scored approvals (real and paper) average at least
+    # LIVE_GATE_MIN_EXP_R. Otherwise the service keeps scoring them on paper.
+    LIVE_GATE_ENABLED: bool = True
+    LIVE_GATE_WINDOW: int = 20
+    LIVE_GATE_MIN_EXP_R: float = 0.05
+
     # Shadow mode
     SHADOW_MODE: bool = True          # Label proposals; the EA enforces no-order shadow mode
     ENABLE_TRADING: bool = False      # Status flag only; this service never sends broker orders

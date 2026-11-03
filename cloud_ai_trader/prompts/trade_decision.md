@@ -26,6 +26,7 @@ Rules:
 - If regime is unclear, high_volatility, or pre_news, answer NO_TRADE.
 - If a position is already open, answer only EXIT or NO_TRADE.
 - Never force a trade. Vetoing a marginal setup is the correct, profitable behaviour.
+- Judge only on the data provided and the rules listed here. Do not invent extra rules such as preferred trading hours or sessions; the market is open and spread is already checked by code.
 
 Respond with a JSON object:
 {

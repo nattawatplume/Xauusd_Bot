@@ -258,6 +258,8 @@ async def trade_opened(
         "ai_reason": approved.get("reason", ""),
     }
     await brain.memory.log_trade_opened(record)
+    if approved.get("bar_time"):
+        await brain.memory.mark_executed(str(approved["bar_time"]))
     return {"status": "ok", "ticket": record["ticket"]}
 
 
@@ -417,7 +419,16 @@ async def api_overview() -> dict[str, Any]:
         "trades": await brain.memory.get_recent_trades(limit=25),
         "equity": await brain.memory.get_equity_curve(),
         "backtest": _backtest_summary(),
+        "live_gate": await brain.shadow.gate_status(),
     }
+
+
+@app.get("/api/journal")
+async def api_journal(days: int = 60) -> dict[str, Any]:
+    """Daily trading journal: real trades per server day plus AI activity."""
+    if brain is None:
+        return {"days": []}
+    return {"days": await brain.memory.get_journal(max(1, min(days, 365))), "live_gate": await brain.shadow.gate_status()}
 
 
 @app.get("/")
@@ -426,9 +437,18 @@ async def root_view() -> RedirectResponse:
     return RedirectResponse(url="/dashboard")
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_view() -> HTMLResponse:
-    html_file = settings.BASE_DIR / "dashboard" / "templates" / "index.html"
+def _page(name: str) -> HTMLResponse:
+    html_file = settings.BASE_DIR / "dashboard" / "templates" / name
     if not html_file.exists():
         return HTMLResponse("<h3>Dashboard template not found</h3>", status_code=404)
     return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_view() -> HTMLResponse:
+    return _page("index.html")
+
+
+@app.get("/journal", response_class=HTMLResponse)
+async def journal_view() -> HTMLResponse:
+    return _page("journal.html")

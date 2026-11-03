@@ -134,6 +134,33 @@ class ShadowTracker:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _resolve)
 
+    async def gate_status(self) -> dict[str, Any]:
+        """Whether AI-approved entries may go live, judged on the latest scored approvals."""
+        window, need = settings.LIVE_GATE_WINDOW, settings.LIVE_GATE_MIN_EXP_R
+
+        def _calc() -> dict[str, Any]:
+            with get_db_connection() as conn:
+                rows = conn.execute(
+                    "SELECT outcome_r FROM decisions WHERE ai_verdict = 'approved' "
+                    "AND outcome IN ('win', 'loss', 'timeout') ORDER BY id DESC LIMIT ?",
+                    (window,),
+                ).fetchall()
+            r = [row["outcome_r"] or 0.0 for row in rows]
+            exp = round(sum(r) / len(r), 3) if r else None
+            if not settings.LIVE_GATE_ENABLED:
+                is_open, why = True, "Live gate disabled."
+            elif len(r) < window:
+                is_open, why = False, f"Only {len(r)}/{window} scored approvals; trading on paper until the sample is complete."
+            elif exp < need:
+                is_open, why = False, f"Last {window} approvals average {exp:+.2f}R (need {need:+.2f}R); trading on paper."
+            else:
+                is_open, why = True, f"Last {window} approvals average {exp:+.2f}R."
+            return {"enabled": settings.LIVE_GATE_ENABLED, "open": is_open, "n": len(r), "window": window,
+                    "expectancy_r": exp, "min_expectancy_r": need, "reason": why}
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _calc)
+
     async def summary(self) -> dict[str, Any]:
         def _calc() -> dict[str, Any]:
             with get_db_connection() as conn:
